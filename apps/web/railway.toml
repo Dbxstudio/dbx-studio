@@ -4,6 +4,7 @@ dockerfilePath = "apps/web/Dockerfile"
 buildContext = "../../"
 
 [deploy]
+startCommand = "/docker-entrypoint.sh"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
