@@ -1,0 +1,8 @@
+
+> @dbx/api@0.0.1 build /Users/jay/Hub9/dbx-studio-dev/apps/api
+> bun build src/index.ts --outdir ./dist --target bun
+
+Bundled 1619 modules in 261ms
+
+  index.js  6.64 MB  (entry point)
+

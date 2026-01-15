@@ -1,0 +1,18 @@
+{
+  "buildCommand": "pnpm install && cd apps/web && pnpm run build",
+  "outputDirectory": "apps/web/.output/public",
+  "installCommand": "npm install -g pnpm && pnpm install",
+  "framework": null,
+  "functions": {
+    "api/index.ts": {
+      "runtime": "edge"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    }
+  ]
+}
+

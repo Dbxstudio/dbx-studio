@@ -1,0 +1,245 @@
+/* Sidebar Component Styles - Matching sumr-ai-sql-client */
+
+.dbx-sidebar {
+    width: 50px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: visible;
+}
+
+.dbx-sidebar.light {
+    background-color: #F8F8F8;
+}
+
+.dbx-sidebar.dark {
+    background-color: #181818;
+    border-right: 1px solid #2a2a2a;
+}
+
+/* Hide scrollbar but keep functionality */
+.dbx-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dbx-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dbx-sidebar::-webkit-scrollbar-thumb {
+    background: transparent;
+}
+
+.dbx-sidebar:hover::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.3);
+}
+
+/* Logo */
+.sidebar-logo-container {
+    width: 100%;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+    margin-bottom: 4px;
+}
+
+.sidebar-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    opacity: 0.9;
+}
+
+.sidebar-logo:hover {
+    opacity: 1;
+}
+
+/* Sidebar Item */
+.sidebar-item {
+    width: 100%;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.sidebar-item:hover {
+    opacity: 0.8;
+}
+
+.sidebar-item:active {
+    transform: scale(0.95);
+}
+
+/* Dark theme */
+.sidebar-item.dark {
+    color: #cccccc;
+}
+
+.sidebar-item.dark:hover {
+    background-color: #141414;
+}
+
+.sidebar-item.dark.active {
+    color: #ffffff;
+}
+
+.sidebar-item.dark.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: #007acc;
+}
+
+/* Tooltip */
+.sidebar-tooltip {
+    position: fixed;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    max-width: 400px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    pointer-events: none;
+    z-index: 999999;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+    background-color: rgba(20, 20, 20, 0.95);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: tooltipFadeIn 160ms ease forwards;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+/* Spacer */
+.sidebar-spacer {
+    flex: 1;
+    min-height: 8px;
+}
+
+/* Profile section */
+.sidebar-profile {
+    width: 100%;
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-icon-container {
+    cursor: pointer;
+}
+
+.profile-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4a90d9, #67b26f);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    transition: transform 0.15s ease;
+}
+
+.profile-icon:hover {
+    transform: scale(1.05);
+}
+
+.profile-icon.profile-image {
+    object-fit: cover;
+    padding: 0;
+}
+
+/* User Menu Popup */
+.user-menu-popup {
+    position: fixed;
+    left: 60px;
+    bottom: 16px;
+    min-width: 220px;
+    border-radius: 8px;
+    z-index: 1000;
+    padding: 4px 0;
+    backdrop-filter: blur(10px);
+}
+
+.user-menu-popup.dark {
+    background-color: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.user-menu-header {
+    padding: 14px 18px;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+    color: #e8e8e8;
+}
+
+.user-email {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #a0a0a0;
+}
+
+.user-menu-divider {
+    height: 1px;
+    margin: 6px 12px;
+    background-color: #333333;
+}
+
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    margin: 0 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 14px;
+    color: #e0e0e0;
+}
+
+.user-menu-item:hover {
+    background-color: #2a2a2a;
+    color: #ffffff;
+}
+
+.user-menu-item span {
+    font-size: 14px;
+    font-weight: 500;
+}

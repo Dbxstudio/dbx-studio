@@ -1,0 +1,47 @@
+{
+    "name": "@dbx/api",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "bun run --hot src/index.ts",
+        "build": "bun build src/index.ts --outdir ./dist --target bun",
+        "start": "bun run dist/index.js",
+        "lint": "eslint src/",
+        "clean": "rm -rf dist node_modules",
+        "db:generate": "drizzle-kit generate",
+        "db:migrate": "drizzle-kit migrate",
+        "db:push": "drizzle-kit push",
+        "db:studio": "drizzle-kit studio"
+    },
+    "dependencies": {
+        "@aws-sdk/client-bedrock-runtime": "^3.966.0",
+        "@clickhouse/client": "^1.15.0",
+        "@electric-sql/pglite": "^0.2.14",
+        "@hono/zod-validator": "^0.4.0",
+        "@orpc/server": "^1.13.0",
+        "arktype": "^2.1.29",
+        "consola": "^3.4.2",
+        "drizzle-orm": "^0.45.1",
+        "drizzle-zod": "^0.5.1",
+        "hono": "^4.6.0",
+        "kysely": "^0.28.9",
+        "mssql": "^12.2.0",
+        "mysql2": "^3.16.0",
+        "nanoid": "^5.1.6",
+        "pg": "^8.16.3",
+        "pg-hstore": "^2.3.4",
+        "sequelize": "^6.37.7",
+        "sqlite3": "^5.1.7",
+        "uuid": "^13.0.0",
+        "zod": "^3.24.0"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "bun-types": "latest",
+        "@types/pg": "^8.16.0",
+        "@types/mssql": "^9.1.8",
+        "typescript": "^5.7.0",
+        "drizzle-kit": "^0.31.8"
+    }
+}

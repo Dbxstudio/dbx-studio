@@ -1,0 +1,41 @@
+
+> @dbx/desktop@0.0.1 build /Users/jay/Hub9/dbx-studio-dev/apps/desktop
+> vite build && electron-vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1755 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.55 kB │ gzip:   0.34 kB
+dist/assets/index-JCiTwaVa.css  106.98 kB │ gzip:  17.97 kB
+dist/assets/index-DBdBpTsJ.js   605.65 kB │ gzip: 167.71 kB │ map: 14,985.68 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.56s
+vite v5.4.21 building SSR bundle for production...
+transforming...
+✓ 1 modules transformed.
+rendering chunks...
+dist-electron/main/index.js  1.76 kB
+✓ built in 102ms
+vite v5.4.21 building SSR bundle for production...
+transforming...
+✓ 1 modules transformed.
+rendering chunks...
+dist-electron/preload/index.mjs  0.99 kB
+✓ built in 5ms
+index.html file is not found in /src/renderer directory.
+error during build:
+Error: build.rollupOptions.input option is required in the electron vite renderer config.
+    at configResolved (file:///Users/jay/Hub9/dbx-studio-dev/node_modules/.pnpm/electron-vite@2.3.0_vite@5.4.21_@types+node@22.19.5_/node_modules/electron-vite/dist/chunks/lib-BmEkZIgk.mjs:547:27)
+    at file:///Users/jay/Hub9/dbx-studio-dev/node_modules/.pnpm/vite@5.4.21_@types+node@22.19.5/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:66689:67
+    at Array.map (<anonymous>)
+    at resolveConfig (file:///Users/jay/Hub9/dbx-studio-dev/node_modules/.pnpm/vite@5.4.21_@types+node@22.19.5/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:66689:53)
+    at async build (file:///Users/jay/Hub9/dbx-studio-dev/node_modules/.pnpm/vite@5.4.21_@types+node@22.19.5/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65503:18)
+    at async build (file:///Users/jay/Hub9/dbx-studio-dev/node_modules/.pnpm/electron-vite@2.3.0_vite@5.4.21_@types+node@22.19.5_/node_modules/electron-vite/dist/chunks/lib-D1n7TA6K.mjs:40:13)
+    at async CAC.<anonymous> (file:///Users/jay/Hub9/dbx-studio-dev/node_modules/.pnpm/electron-vite@2.3.0_vite@5.4.21_@types+node@22.19.5_/node_modules/electron-vite/dist/cli.mjs:83:9)
+ ELIFECYCLE  Command failed with exit code 1.

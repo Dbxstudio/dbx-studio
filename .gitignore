@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+
+# Database
+apps/api/data/dbx.db
+apps/api/data/ai_database.db
+apps/api/apps/api/data/dbx.db
+
+# OS files
+.DS_Store

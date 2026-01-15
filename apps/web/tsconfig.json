@@ -1,0 +1,33 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "resolveJsonModule": true,
+        "jsx": "react-jsx",
+        "outDir": "./dist",
+        "rootDir": ".",
+        "baseUrl": ".",
+        "paths": {
+            "~/*": [
+                "./app/*"
+            ],
+            "@/*": [
+                "./app/*"
+            ]
+        }
+    },
+    "include": [
+        "app/**/*",
+        "app.config.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        ".output",
+        ".vinxi"
+    ]
+}

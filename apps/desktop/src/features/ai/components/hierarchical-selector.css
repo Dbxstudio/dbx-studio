@@ -1,0 +1,394 @@
+/* Hierarchical Selector Styles - Scoped to prevent conflicts */
+
+/* Container */
+.hierarchical-selector-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Selector wrapper - provides positioning context */
+.hierarchical-selector-container .selector-wrapper {
+  position: relative;
+  min-width: 100px;
+  flex: 1;
+  max-width: 200px;
+}
+
+/* Selector Button - Sleek modern appearance */
+.hierarchical-selector-container .selector-button {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e4e4e7;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  backdrop-filter: blur(8px);
+}
+
+.hierarchical-selector-container .selector-button:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.hierarchical-selector-container .selector-button.open {
+  background: rgba(74, 158, 255, 0.1);
+  border-color: #4a9eff;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
+}
+
+.hierarchical-selector-container .selector-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hierarchical-selector-container .selector-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.hierarchical-selector-container .selector-icon {
+  font-size: 12px;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+
+.hierarchical-selector-container .selector-text {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: #e4e4e7;
+  font-weight: 500;
+}
+
+.hierarchical-selector-container .chevron {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  color: #71717a;
+}
+
+.hierarchical-selector-container .chevron.open {
+  transform: rotate(180deg);
+  color: #4a9eff;
+}
+
+.hierarchical-selector-container .spinner-small {
+  font-size: 12px;
+  animation: hierarchicalSpin 1s linear infinite;
+  color: #4a9eff;
+  flex-shrink: 0;
+}
+
+/* Dropdown styles - Premium floating panel */
+.hierarchical-selector-container .selector-dropdown {
+  position: absolute;
+  left: 0;
+  z-index: 9999;
+  background: #1c1c1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  min-width: 160px;
+  max-width: 280px;
+  max-height: 280px;
+  overflow: hidden;
+  animation: hierarchicalDropdownSlide 0.15s ease-out;
+}
+
+@keyframes hierarchicalDropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hierarchical-selector-container .selector-dropdown.dropdown {
+  top: calc(100% + 6px);
+}
+
+.hierarchical-selector-container .selector-dropdown.dropup {
+  bottom: calc(100% + 6px);
+  animation: hierarchicalDropdownSlideUp 0.15s ease-out;
+}
+
+@keyframes hierarchicalDropdownSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hierarchical-selector-container .dropdown-content {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* Dropdown Item - Clean hover states */
+.hierarchical-selector-container .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  font-size: 12px;
+  color: #d4d4d8;
+  border-radius: 6px;
+  margin: 1px 0;
+  position: relative;
+}
+
+.hierarchical-selector-container .dropdown-item:hover {
+  background: rgba(74, 158, 255, 0.12);
+  color: #fff;
+}
+
+.hierarchical-selector-container .dropdown-item.selected {
+  background: rgba(74, 158, 255, 0.18);
+  color: #4a9eff;
+  font-weight: 500;
+}
+
+.hierarchical-selector-container .dropdown-item.selected::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  width: 3px;
+  height: 16px;
+  background: #4a9eff;
+  border-radius: 2px;
+}
+
+.hierarchical-selector-container .dropdown-item.no-data {
+  color: #52525b;
+  cursor: default;
+  font-style: italic;
+}
+
+.hierarchical-selector-container .dropdown-item.no-data:hover {
+  background: transparent;
+  color: #52525b;
+}
+
+.hierarchical-selector-container .item-icon {
+  font-size: 12px;
+  color: #71717a;
+  flex-shrink: 0;
+}
+
+.hierarchical-selector-container .dropdown-item:hover .item-icon {
+  color: #a1a1aa;
+}
+
+.hierarchical-selector-container .dropdown-item.selected .item-icon {
+  color: #4a9eff;
+}
+
+.hierarchical-selector-container .item-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Custom Scrollbar for dropdown */
+.hierarchical-selector-container .dropdown-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hierarchical-selector-container .dropdown-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hierarchical-selector-container .dropdown-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.hierarchical-selector-container .dropdown-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Schema-specific styles */
+.hierarchical-selector-container .schema-button .selector-icon {
+  color: #f59e0b;
+}
+
+.hierarchical-selector-container .table-button .selector-icon {
+  color: #10b981;
+}
+
+/* Light theme support */
+.light-theme .hierarchical-selector-container .selector-button {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #3f3f46;
+}
+
+.light-theme .hierarchical-selector-container .selector-button:hover:not(.disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #18181b;
+}
+
+.light-theme .hierarchical-selector-container .selector-button.open {
+  background: rgba(74, 158, 255, 0.08);
+  border-color: #4a9eff;
+  color: #18181b;
+}
+
+.light-theme .hierarchical-selector-container .selector-text {
+  color: #3f3f46;
+}
+
+.light-theme .hierarchical-selector-container .selector-icon {
+  color: #71717a;
+}
+
+.light-theme .hierarchical-selector-container .chevron {
+  color: #a1a1aa;
+}
+
+.light-theme .hierarchical-selector-container .chevron.open {
+  color: #4a9eff;
+}
+
+.light-theme .hierarchical-selector-container .selector-dropdown {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .hierarchical-selector-container .dropdown-item {
+  color: #3f3f46;
+}
+
+.light-theme .hierarchical-selector-container .dropdown-item:hover {
+  background: rgba(74, 158, 255, 0.1);
+  color: #18181b;
+}
+
+.light-theme .hierarchical-selector-container .dropdown-item.selected {
+  background: rgba(74, 158, 255, 0.12);
+  color: #2563eb;
+}
+
+.light-theme .hierarchical-selector-container .dropdown-item.selected .item-icon {
+  color: #2563eb;
+}
+
+.light-theme .hierarchical-selector-container .dropdown-item.no-data {
+  color: #a1a1aa;
+}
+
+.light-theme .hierarchical-selector-container .item-icon {
+  color: #71717a;
+}
+
+.light-theme .hierarchical-selector-container .dropdown-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.light-theme .hierarchical-selector-container .dropdown-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .hierarchical-selector-container {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .hierarchical-selector-container .selector-wrapper {
+    width: 100%;
+    max-width: none;
+    min-width: unset;
+  }
+
+  .hierarchical-selector-container .selector-dropdown {
+    min-width: 100%;
+    left: 0;
+    right: 0;
+  }
+
+  .hierarchical-selector-container .selector-text {
+    font-size: 11px;
+  }
+
+  .hierarchical-selector-container .dropdown-item {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hierarchical-selector-container .selector-button {
+    padding: 5px 8px;
+    min-height: 28px;
+  }
+
+  .hierarchical-selector-container .selector-content {
+    gap: 6px;
+  }
+
+  .hierarchical-selector-container .selector-text {
+    font-size: 10px;
+  }
+
+  .hierarchical-selector-container .dropdown-item {
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+
+  .hierarchical-selector-container .item-icon,
+  .hierarchical-selector-container .chevron,
+  .hierarchical-selector-container .spinner-small {
+    font-size: 10px;
+  }
+}
+
+/* Animation */
+@keyframes hierarchicalSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

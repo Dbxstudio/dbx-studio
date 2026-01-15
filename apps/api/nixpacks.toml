@@ -1,0 +1,13 @@
+[phases.setup]
+nixPkgs = ["bun"]
+
+[phases.install]
+cmds = [
+  "bun install --no-save"
+]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "bun run src/index.ts"

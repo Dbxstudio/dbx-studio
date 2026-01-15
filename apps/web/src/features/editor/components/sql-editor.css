@@ -1,0 +1,375 @@
+/* SQL Editor Panel - Matching Sumr-ai-client */
+
+.sql-editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #1f1f1f;
+    overflow: hidden;
+}
+
+/* Toolbar */
+.sql-editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0px 12px;
+    background: #1f1f1f;
+    flex-shrink: 0;
+    min-height: 40px;
+    gap: 12px;
+    border-bottom: 1px solid #333;
+}
+
+.toolbar-left,
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.toolbar-center {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    justify-content: end;
+    /* gap: 20px; */
+    position: relative;
+    overflow: visible;
+}
+
+/* Divider between dropdowns */
+.toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: #444;
+    flex-shrink: 0;
+}
+
+/* Toolbar Buttons */
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid #444;
+    background: transparent;
+    color: #cccccc;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 28px;
+    white-space: nowrap;
+}
+
+.toolbar-btn:hover {
+    background: #2a2a2a;
+    border-color: #666;
+    color: #fff;
+}
+
+.toolbar-btn:active {
+    transform: translateY(0);
+}
+
+.toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Run Button */
+.toolbar-btn.run-btn {
+    background: transparent;
+    color: #cccccc;
+    border-color: #444;
+}
+
+.toolbar-btn.run-btn:hover {
+    color: #4CAF50;
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.toolbar-btn.run-btn.running {
+    color: #ff9800;
+    border-color: #ff9800;
+    background: rgba(255, 152, 0, 0.1);
+}
+
+/* AI Button */
+.toolbar-btn.ai-btn {
+    background: transparent;
+    color: #cccccc;
+    border-color: #444;
+}
+
+.toolbar-btn.ai-btn:hover {
+    color: #7c4dff;
+    border-color: #7c4dff;
+    background: rgba(124, 77, 255, 0.1);
+}
+
+/* Selector Dropdowns - Each Distinct */
+.selector-group {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    margin: 0 8px;
+}
+
+.selector-group:first-child {
+    margin-left: 0;
+}
+
+.selector-group:last-child {
+    margin-right: 0;
+}
+
+.selector-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #ccc;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 100px;
+    max-width: 180px;
+    height: 32px;
+    user-select: none;
+}
+
+.selector-dropdown:hover {
+    background: #2a2a2a;
+    border-color: #666;
+}
+
+.selector-dropdown:active {
+    background: #333;
+}
+
+.selector-value {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #fff;
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.selector-placeholder {
+    flex: 1;
+    color: #777;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.selector-arrow {
+    color: #666;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.selector-group:hover .selector-arrow {
+    color: #aaa;
+}
+
+/* Dropdown Menu */
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    width: max-content;
+    max-width: 280px;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    animation: dropdownFadeIn 0.12s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    color: #cccccc;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.dropdown-item:hover {
+    background: #333;
+    color: #fff;
+}
+
+.dropdown-item.selected {
+    background: rgba(79, 195, 247, 0.12);
+    color: #4FC3F7;
+}
+
+.dropdown-item:first-child {
+    border-radius: 7px 7px 0 0;
+}
+
+.dropdown-item:last-child {
+    border-radius: 0 0 7px 7px;
+}
+
+.dropdown-item:not(:last-child) {
+    border-bottom: 1px solid #333;
+}
+
+.schema-table-count {
+    font-size: 11px;
+    color: #666;
+    margin-left: auto;
+}
+
+/* Database/Dialect Icons */
+.db-icon {
+    flex-shrink: 0;
+}
+
+.db-icon.postgres {
+    color: #336791;
+}
+
+.db-icon.mysql {
+    color: #00758F;
+}
+
+.db-icon.sqlite {
+    color: #003B57;
+}
+
+.db-icon.mariadb {
+    color: #003545;
+}
+
+.db-icon.snowflake {
+    color: #29B5E8;
+}
+
+.db-icon.clickhouse {
+    color: #FFCC00;
+}
+
+.db-icon.default {
+    color: #888;
+}
+
+/* Editor Wrapper */
+.sql-editor-wrapper {
+    flex: 1;
+    min-height: 0;
+    background: #1f1f1f;
+    overflow: hidden;
+}
+
+/* Monaco Editor Customizations */
+.sql-editor-wrapper .monaco-editor {
+    background: #1f1f1f !important;
+}
+
+.sql-editor-wrapper .monaco-editor .margin {
+    background: #1f1f1f !important;
+}
+
+.sql-editor-wrapper .monaco-editor .monaco-editor-background {
+    background: #1f1f1f !important;
+}
+
+/* Line numbers */
+.sql-editor-wrapper .monaco-editor .margin-view-overlays .line-numbers {
+    color: #6e7681 !important;
+}
+
+/* Current line */
+.sql-editor-wrapper .monaco-editor .current-line {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Selection */
+.sql-editor-wrapper .monaco-editor .selected-text {
+    background: rgba(79, 195, 247, 0.3) !important;
+}
+
+/* Suggestion Widget */
+.sql-editor-wrapper .monaco-editor .suggest-widget {
+    background: #1f1f1f !important;
+    border: 1px solid #444 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+    color: #ffffff !important;
+}
+
+.sql-editor-wrapper .monaco-editor .suggest-widget .monaco-list .monaco-list-row {
+    background: transparent !important;
+    color: #ffffff !important;
+}
+
+.sql-editor-wrapper .monaco-editor .suggest-widget .monaco-list .monaco-list-row:hover {
+    background: #2a2a2a !important;
+}
+
+.sql-editor-wrapper .monaco-editor .suggest-widget .monaco-list .monaco-list-row.focused {
+    background: #333 !important;
+}
+
+/* Hide scrollbars in editor for cleaner look */
+.sql-editor-wrapper .monaco-editor .monaco-scrollable-element>.scrollbar {
+    width: 8px !important;
+}
+
+.sql-editor-wrapper .monaco-editor .monaco-scrollable-element>.scrollbar>.slider {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 4px !important;
+}
+
+.sql-editor-wrapper .monaco-editor .monaco-scrollable-element>.scrollbar>.slider:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Spinner Animation */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}

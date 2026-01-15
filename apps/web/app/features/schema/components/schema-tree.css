@@ -1,0 +1,575 @@
+/* ========================================
+   Schema Tree - Matching Sumr-ai-client Exactly
+   Professional SQL Client Theme
+   ======================================== */
+
+/* Database Type Icons - Colored for visual distinction */
+.db-type-icon {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.db-type-icon.postgres {
+    color: #336791;
+}
+
+.db-type-icon.sqlite {
+    color: #003B57;
+}
+
+.db-type-icon.mysql {
+    color: #00758F;
+}
+
+.db-type-icon.mssql {
+    color: #CC2927;
+}
+
+.db-type-icon.mariadb {
+    color: #003545;
+}
+
+.db-type-icon.snowflake {
+    color: #29B5E8;
+}
+
+.db-type-icon.clickhouse {
+    color: #FFCC00;
+}
+
+.db-type-icon.default {
+    color: #888;
+}
+
+/* Schema Tree Container */
+.schema-tree-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    background: #181818;
+    color: #cccccc;
+    border-radius: 4px;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.schema-tree-container *,
+.schema-tree-container *:before,
+.schema-tree-container *:after {
+    box-sizing: border-box;
+}
+
+/* Header Section */
+.schema-header {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    border-bottom: 1px solid #2a2a2a;
+    gap: 8px;
+    flex-shrink: 0;
+    background: #181818;
+    transition: all 0.2s ease;
+    overflow: visible;
+    position: relative;
+}
+
+.schema-title {
+    display: flex;
+    align-items: center;
+    gap: 0px;
+    flex: 1;
+    min-width: 0;
+}
+
+.schema-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #cccccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.schema-controls {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.schema-btn {
+    padding: 5px 7px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    background: transparent;
+    border: none;
+    color: #888;
+}
+
+.schema-btn:hover:not(:disabled) {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.schema-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.schema-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Add Connection Button */
+.add-connection-btn {
+    background: transparent !important;
+    color: #0288D1 !important;
+    border: 1px solid transparent !important;
+    box-shadow: none;
+}
+
+.add-connection-btn:hover:not(:disabled) {
+    background: rgba(2, 136, 209, 0.15) !important;
+    border-color: transparent !important;
+    box-shadow: none;
+    transform: translateY(-1px);
+}
+
+.collapse-schema-btn {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none;
+}
+
+/* Content Wrapper */
+.schema-content-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 8px 8px;
+    -webkit-overflow-scrolling: touch;
+    will-change: scroll-position;
+}
+
+.schema-content-wrapper::-webkit-scrollbar {
+    width: 0px;
+    display: none;
+}
+
+/* Empty State */
+.schema-empty {
+    padding: 16px 12px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    font-size: 11px;
+}
+
+/* Connection Block */
+.connection-block {
+    position: relative;
+    overflow: visible;
+    padding: 1px;
+}
+
+.connection-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.connection-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.connection-header.expanded {
+    background: #181818;
+}
+
+.connection-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    color: #888;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.connection-toggle:hover {
+    color: #fff;
+}
+
+.connection-name {
+    flex: 1;
+    font-weight: 500;
+    color: #cccccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.connection-status {
+    color: #4CAF50;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* Schema Item */
+.schema-item {
+    position: relative;
+    z-index: 1;
+    margin: 0px 0 0px 12px;
+    padding-left: 8px;
+    transition: border-color 0.2s ease;
+}
+
+.schema-item:hover {
+    border-left-color: #181818;
+}
+
+/* Database Object Groups (Tables, Views, Functions, etc.) */
+.db-object-group {
+    margin: 2px 0 4px 0;
+    padding-left: 6px;
+}
+
+.db-object-group-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+    font-weight: 600;
+    font-size: 13px;
+    color: #aaa;
+}
+
+.db-object-group-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+}
+
+.db-object-icon {
+    color: #888;
+    flex-shrink: 0;
+}
+
+.db-object-icon.folder-icon {
+    color: #FFC107;
+}
+
+.db-object-label {
+    flex: 1;
+    font-weight: 400;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.db-object-count {
+    background: #25282e;
+    color: #777;
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 16px;
+    text-align: center;
+}
+
+/* Tables List */
+.tables-list {
+    position: relative;
+    z-index: 1;
+}
+
+/* Table Item */
+.table-item {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    min-height: 0;
+    width: 100%;
+    margin: 2px 0;
+}
+
+/* Table Header */
+.table-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    margin: 1px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    position: relative;
+    min-width: 0;
+    background: transparent;
+    user-select: none;
+}
+
+.table-header:active {
+    transform: translateX(1px);
+    background: rgba(79, 195, 247, 0.12);
+}
+
+.table-header.active {
+    background: #313131;
+}
+
+.table-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 10px;
+    color: #888;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.table-toggle:hover {
+    color: #fff;
+}
+
+.table-icon {
+    color: #4FC3F7;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.table-header:hover .table-icon {
+    color: #29B6F6;
+}
+
+.table-name {
+    flex: 1;
+    font-weight: 500;
+    color: #cccccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-size: 12px;
+}
+
+/* Table Details */
+.table-details {
+    margin: 0px 0 0px 14px;
+    padding: 2px 0;
+}
+
+/* Table Detail Sections */
+.table-detail-section {
+    margin: 2px 0;
+    padding-left: 8px;
+}
+
+.table-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    color: #999;
+    font-weight: 600;
+}
+
+.table-detail-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #bbb;
+}
+
+.detail-toggle {
+    width: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+    flex-shrink: 0;
+}
+
+.detail-icon {
+    color: #777;
+    flex-shrink: 0;
+}
+
+.detail-icon.folder-icon {
+    color: #FFC107;
+}
+
+.detail-label {
+    flex: 1;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 12px;
+}
+
+.detail-count {
+    background: #1f1f1f;
+    color: #666;
+    padding: 1px 4px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 14px;
+    text-align: center;
+}
+
+/* Table Detail List */
+.table-detail-list {
+    margin: 2px 0 0 10px;
+    padding: 0;
+}
+
+/* Column Item */
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0px 2px 20px;
+    border-radius: 2px;
+    transition: background 0.15s ease;
+    font-size: 9px;
+    color: #B0BEC5 !important;
+}
+
+.detail-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.detail-item-icon {
+    color: #78909C !important;
+    flex-shrink: 0;
+}
+
+.detail-item-icon.key-icon {
+    color: #FFA726 !important;
+}
+
+.detail-item-name {
+    flex: 1;
+    color: #B0BEC5 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    font-size: 12px;
+}
+
+.detail-item-type {
+    color: #90A4AE !important;
+    background: #263238;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 9px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Schema Header */
+.schema-header-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.schema-header-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.schema-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    color: #777;
+    flex-shrink: 0;
+}
+
+.schema-icon {
+    color: #a78bfa;
+    flex-shrink: 0;
+}
+
+.schema-name {
+    flex: 1;
+    font-weight: 500;
+    color: #cccccc;
+    font-size: 12px;
+}
+
+.schema-count {
+    background: #25282e;
+    color: #777;
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* Loading state */
+.schema-status {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.schema-status.loading {
+    color: #999;
+    background: rgba(153, 153, 153, 0.05);
+}
+
+/* Spinning animation */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+}

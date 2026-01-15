@@ -1,0 +1,7 @@
+{
+  "buildCommand": "pnpm install && pnpm run build",
+  "outputDirectory": ".output/public",
+  "installCommand": "npm install -g pnpm && pnpm install",
+  "framework": null,
+  "regions": ["iad1"]
+}

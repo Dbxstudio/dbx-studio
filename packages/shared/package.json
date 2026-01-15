@@ -1,0 +1,25 @@
+{
+    "name": "@dbx/shared",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts",
+        "./constants": "./src/constants/index.ts",
+        "./types": "./src/types/index.ts"
+    },
+    "scripts": {
+        "lint": "eslint src/",
+        "clean": "rm -rf dist node_modules"
+    },
+    "dependencies": {
+        "arktype": "^2.0.0",
+        "nanoid": "^5.0.8"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.0",
+        "typescript": "^5.7.0"
+    }
+}

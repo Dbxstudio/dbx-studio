@@ -1,0 +1,6 @@
+
+> @dbx/ui@0.0.1 lint /Users/jay/Hub9/dbx-studio-dev/packages/ui
+> eslint src/
+
+sh: eslint: command not found
+ ELIFECYCLE  Command failed.

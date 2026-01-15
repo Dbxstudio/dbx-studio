@@ -1,0 +1,542 @@
+/* Connection Modal Styles - Matching sumr-ai-sql-client */
+
+/* Overlay */
+.connection-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+/* Type Selector & Modal */
+.connection-type-selector,
+.connection-modal {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+.connection-type-selector.dark-theme,
+.connection-modal.dark-theme {
+    background-color: #181818;
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 24px;
+    border: 1px solid #444;
+}
+
+.connection-type-selector {
+    min-width: 500px;
+    max-width: 600px;
+}
+
+.connection-modal {
+    min-width: 500px;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow: auto;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Modal Header */
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 12px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-header-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-header-title .postgres-icon {
+    color: #336791;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Connection Type Grid */
+.connection-type-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.connection-type-card {
+    padding: 24px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+    background-color: #1f1f1f;
+    position: relative;
+}
+
+.connection-type-card:hover:not(.coming-soon) {
+    border-color: #666;
+    background-color: #333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.connection-type-card:active:not(.coming-soon) {
+    transform: translateY(0);
+}
+
+.connection-type-card.coming-soon {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.connection-type-icon {
+    transition: transform 0.2s ease;
+}
+
+.connection-type-card:hover:not(.coming-soon) .connection-type-icon {
+    transform: scale(1.1);
+}
+
+/* Database Type Icon Colors - Dark Theme (matching sumr-ai-sql-client) */
+.connection-type-icon.postgres {
+    color: #5D9CEC;
+}
+
+.connection-type-icon.mysql {
+    color: #4FB7C5;
+}
+
+.connection-type-icon.sqlite {
+    color: #4E9ED4;
+}
+
+.connection-type-icon.clickhouse {
+    color: #FFCC00;
+}
+
+.connection-type-icon.snowflake {
+    color: #29B5E8;
+}
+
+.connection-type-icon.mariadb {
+    color: #C0765A;
+}
+
+/* PostgreSQL icon in modal header */
+.postgres {
+    color: #5D9CEC;
+}
+
+.connection-type-icon-wrapper {
+    margin-bottom: 8px;
+}
+
+.connection-type-name {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.connection-type-desc {
+    font-size: 12px;
+    color: #999;
+}
+
+.coming-soon-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: #0277BD;
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+/* Form */
+.connection-form {
+    animation: formSlideIn 0.3s ease-out;
+}
+
+@keyframes formSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.form-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    animation: fieldFadeIn 0.3s ease-out both;
+}
+
+.form-group:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.form-group:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.form-group:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+.form-group:nth-child(4) {
+    animation-delay: 0.2s;
+}
+
+.form-group:nth-child(5) {
+    animation-delay: 0.25s;
+}
+
+.form-group:nth-child(6) {
+    animation-delay: 0.3s;
+}
+
+.form-group:nth-child(7) {
+    animation-delay: 0.35s;
+}
+
+@keyframes fieldFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 550;
+}
+
+.form-group .required {
+    color: #f44336;
+}
+
+.form-group .hint {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #999;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background-color: #2a2a2a;
+    color: #ffffff;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #4a9eff;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+}
+
+/* Form Select (Dropdown) */
+.form-select,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background-color: #2a2a2a;
+    color: #ffffff;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.form-select:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #4a9eff;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+}
+
+.form-select option,
+.form-group select option {
+    background-color: #2a2a2a;
+    color: #ffffff;
+}
+
+/* Toggle Switch */
+.toggle-group {
+    margin-top: 8px;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #4b5563;
+    transition: 0.2s;
+    border-radius: 24px;
+}
+
+.toggle-switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.2s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked+.slider {
+    background-color: #10b981;
+}
+
+.toggle-switch input:checked+.slider:before {
+    transform: translateX(20px);
+}
+
+/* Messages */
+.message-box {
+    margin-bottom: 16px;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.message-box.error {
+    background-color: #3a1e1e;
+    color: #f87171;
+    border: 1px solid #5a2e2e;
+}
+
+.message-box.success {
+    background-color: #1e3a1e;
+    color: #4ade80;
+    border: 1px solid #2e4a2e;
+}
+
+.test-success {
+    margin-top: 16px;
+    padding: 12px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4ade80;
+}
+
+/* Modal Actions */
+.modal-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #444;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #10b981;
+    border-color: #059669;
+    color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #059669;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: transparent;
+    border-color: #444;
+    color: #d4d4d4;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #333;
+    color: #fff;
+}
+
+.btn-outline {
+    background-color: transparent;
+    border-color: #4a9eff;
+    color: #4a9eff;
+}
+
+.btn-outline:hover:not(:disabled) {
+    background-color: rgba(74, 158, 255, 0.1);
+}
+
+/* Scrollbar */
+.connection-modal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.connection-modal::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+.connection-modal::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.connection-modal::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Spin Animation */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+
+    .connection-type-selector,
+    .connection-modal {
+        min-width: 90vw !important;
+        margin: 20px;
+    }
+
+    .connection-type-grid {
+        grid-template-columns: 1fr;
+    }
+}
