@@ -3,6 +3,9 @@ FROM oven/bun:latest
 
 WORKDIR /app
 
+# Disable Corepack to prevent pnpm lookups
+RUN corepack disable || true
+
 # Copy only API directory
 COPY apps/api/package.json apps/api/bun.lockb* ./
 
