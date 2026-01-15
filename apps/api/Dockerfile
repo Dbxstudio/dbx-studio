@@ -3,8 +3,10 @@ FROM oven/bun:latest
 
 WORKDIR /app
 
-# Install pnpm to satisfy any runtime checks (even though we use Bun)
-RUN npm install -g pnpm
+# Install pnpm standalone (doesn't require npm)
+RUN curl -fsSL https://get.pnpm.io/install.sh | ENV="/.bashrc" SHELL="$(which sh)" sh - && \
+    ln -s /root/.local/share/pnpm/pnpm /usr/local/bin/pnpm || \
+    (curl -fsSL -o /usr/local/bin/pnpm https://github.com/pnpm/pnpm/releases/latest/download/pnpm-linuxstatic-x64 && chmod +x /usr/local/bin/pnpm)
 
 # Copy only API directory
 COPY apps/api/package.json apps/api/bun.lockb* ./
