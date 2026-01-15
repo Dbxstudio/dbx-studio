@@ -3,8 +3,8 @@ FROM oven/bun:latest
 
 WORKDIR /app
 
-# Disable Corepack to prevent pnpm lookups
-RUN corepack disable || true
+# Install pnpm to satisfy any runtime checks (even though we use Bun)
+RUN npm install -g pnpm
 
 # Copy only API directory
 COPY apps/api/package.json apps/api/bun.lockb* ./
@@ -20,6 +20,10 @@ RUN mkdir -p /app/data && chmod 777 /app/data
 
 # Set default PORT (Railway will override this)
 ENV PORT=3002
+
+# Disable Corepack to prevent pnpm/yarn lookups at runtime
+ENV COREPACK_ENABLE_STRICT=0 \
+    COREPACK_ENABLE_AUTO_PIN=0
 
 # Expose port
 EXPOSE 3002
