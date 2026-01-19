@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../services/api'
 import { toast } from 'sonner'
 import { authenticatedFetch } from '../utils/authTokenManager'
+import { MAIN_SERVER_ENDPOINT } from '../constants/serverConfig'
 
 // Types
 export interface Connection {
@@ -91,7 +92,7 @@ export function useCreateConnection() {
 
             // Then register with main server for AI features (non-blocking)
             try {
-                const mainServerUrl = import.meta.env.VITE_MAIN_SERVER_URL || 'https://fp9waphqm5.us-east-1.awsapprunner.com/api/v1'
+                const mainServerUrl = MAIN_SERVER_ENDPOINT
 
                 // Build connection string based on type
                 const username = encodeURIComponent(input.username || '')

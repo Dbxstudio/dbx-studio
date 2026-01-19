@@ -8,10 +8,12 @@ const TOKEN_KEY = 'dbx_auth_token'
 const USER_INFO_KEY = 'dbx_user_info'
 const TOKEN_EXPIRY_KEY = 'dbx_token_expiry'
 const REFRESH_TOKEN_KEY = 'dbx_refresh_token'
-const TOKEN_TYPE_KEY = 'dbx_token_type' // 'custom' or 'firebase'
+const TOKEN_TYPE_KEY = 'dbx_token_type' // 'custom' | 'firebase' | 'cognito'
 
-// Main server endpoint (same as sumr-ai-sql-client)
-const MAIN_SERVER_ENDPOINT = import.meta.env.VITE_MAIN_SERVER_URL || 'https://fp9waphqm5.us-east-1.awsapprunner.com/api/v1'
+// Import server configuration
+import { MAIN_SERVER_ENDPOINT, AUTH_ENDPOINTS } from '../constants/serverConfig'
+import { getAuthToken as getCognitoToken } from './cognitoTokenManager'
+
 const FIREBASE_API_KEY = import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDbwkcGLiA1Qzv0b2kexialt2mLyZ3FwT0'
 
 // Token expiry buffer (refresh if token expires in less than 5 minutes)
@@ -53,10 +55,10 @@ export function getUserInfo(): UserInfo | null {
 }
 
 /**
- * Get the token type (custom or firebase)
+ * Get the token type (custom, firebase, or cognito)
  */
-export function getTokenType(): 'custom' | 'firebase' {
-    return (localStorage.getItem(TOKEN_TYPE_KEY) as 'custom' | 'firebase') || 'custom'
+export function getTokenType(): 'custom' | 'firebase' | 'cognito' {
+    return (localStorage.getItem(TOKEN_TYPE_KEY) as 'custom' | 'firebase' | 'cognito') || 'custom'
 }
 
 /**
@@ -176,8 +178,35 @@ export async function refreshAuthToken(): Promise<{ success: boolean; token?: st
 
     if (tokenType === 'firebase') {
         return await refreshFirebaseToken()
+    } else if (tokenType === 'cognito') {
+        return await refreshCognitoToken()
     } else {
         return await refreshCustomToken()
+    }
+}
+
+/**
+ * Refresh Cognito token (Amplify handles this automatically)
+ */
+async function refreshCognitoToken(): Promise<{ success: boolean; token?: string; error?: string }> {
+    try {
+        // Amplify automatically refreshes tokens when calling getCognitoToken
+        const token = await getCognitoToken()
+
+        if (token) {
+            // Update the stored token
+            localStorage.setItem(TOKEN_KEY, token)
+
+            // Update expiry (Cognito tokens typically last 1 hour)
+            const expiryTime = Date.now() + (60 * 60 * 1000)
+            localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString())
+
+            return { success: true, token }
+        }
+
+        return { success: false, error: 'Failed to refresh Cognito token' }
+    } catch (error: any) {
+        return { success: false, error: error.message || 'Cognito token refresh failed' }
     }
 }
 
@@ -192,7 +221,7 @@ async function refreshCustomToken(): Promise<{ success: boolean; token?: string;
 
     try {
         // Call backend to refresh the token
-        const response = await fetch(`${MAIN_SERVER_ENDPOINT}/auth/refresh`, {
+        const response = await fetch(AUTH_ENDPOINTS.REFRESH, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
