@@ -3,12 +3,20 @@ import { LuMail, LuEye, LuEyeOff, LuArrowLeft } from 'react-icons/lu'
 import { useAuth } from '../../context/AuthContext'
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail } from '../../../../shared/utils/firebase'
 import { setCustomAuthToken } from '../../../../shared/utils/authTokenManager'
+import {
+  signUpWithEmail as cognitoSignUp,
+  confirmSignUpWithCode,
+  signInWithEmail as cognitoSignIn,
+  resendVerificationCode,
+} from '../../../../shared/utils/cognitoAuth'
+import { syncUserWithBackend } from '../../../../shared/utils/cognitoTokenManager'
+import { VerificationCode } from '../VerificationCode'
 import './Login.css'
 
 // Main Server API endpoint
-const MAIN_SERVER_URL = import.meta.env.VITE_MAIN_SERVER_URL || 'https://fp9waphqm5.us-east-1.awsapprunner.com/api/v1'
+import { MAIN_SERVER_ENDPOINT } from '../../../../shared/constants/serverConfig'
 
-type ViewType = 'options' | 'emailForm' | 'forgotPassword'
+type ViewType = 'options' | 'emailForm' | 'forgotPassword' | 'verification'
 type AuthMode = 'login' | 'signup'
 
 interface LoginProps {
@@ -30,11 +38,21 @@ export function Login({ onSuccess }: LoginProps) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [firstName, setFirstName] = useState('')
+    const [lastName, setLastName] = useState('')
+    const [genderId, setGenderId] = useState('')
+
+    // Cognito verification state
+    const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null)
+    const [pendingVerificationUsername, setPendingVerificationUsername] = useState<string | null>(null)
+    const [pendingUserData, setPendingUserData] = useState<any>(null)
+    const [pendingPassword, setPendingPassword] = useState<string | null>(null)
 
     // Mode and view
     const [authMode, setAuthMode] = useState<AuthMode>('login')
     const [currentView, setCurrentView] = useState<ViewType>('options')
     const [authLoadingMessage, setAuthLoadingMessage] = useState('Authenticating...')
+    const [useCognito, setUseCognito] = useState(true) // Use Cognito by default
 
     // Clear errors after timeout
     useEffect(() => {
@@ -73,7 +91,100 @@ export function Login({ onSuccess }: LoginProps) {
         setEmail('')
         setPassword('')
         setConfirmPassword('')
+        setFirstName('')
+        setLastName('')
+        setGenderId('')
     }, [])
+
+    // Cognito verification handlers
+    const handleVerifyCode = useCallback(async (code: string) => {
+        const result = await confirmSignUpWithCode(
+            pendingVerificationUsername || pendingVerificationEmail!,
+            code
+        )
+
+        if (result.success) {
+            await handlePostVerification()
+            return { success: true }
+        }
+
+        return result
+    }, [pendingVerificationUsername, pendingVerificationEmail])
+
+    const handlePostVerification = useCallback(async () => {
+        try {
+            // Auto-login after verification
+            const signInResult = await cognitoSignIn(pendingVerificationEmail!, pendingPassword!)
+
+            if (signInResult.success) {
+                // Sync with backend
+                const syncResult = await syncUserWithBackend(
+                    { ...signInResult.user, ...pendingUserData },
+                    signInResult.token!,
+                    true // isSignup
+                )
+
+                if (syncResult.success) {
+                    // Store tokens in localStorage
+                    const expiryTime = signInResult.expiresAt
+                        ? signInResult.expiresAt * 1000
+                        : Date.now() + 60 * 60 * 1000
+
+                    localStorage.setItem('dbx_auth_token', signInResult.token!)
+                    localStorage.setItem('dbx_refresh_token', signInResult.refreshToken || '')
+                    localStorage.setItem('dbx_token_expiry', expiryTime.toString())
+                    localStorage.setItem('dbx_token_type', 'cognito')
+                    localStorage.setItem('dbx_user_info', JSON.stringify(syncResult.user))
+
+                    setLoginSuccess(true)
+                    setTimeout(() => window.location.reload(), 1500)
+                }
+            }
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Verification failed')
+        }
+    }, [pendingVerificationEmail, pendingPassword, pendingUserData])
+
+    const handleResendCode = useCallback(async () => {
+        const result = await resendVerificationCode(pendingVerificationEmail!)
+        return result
+    }, [pendingVerificationEmail])
+
+    // Cognito login handler
+    const handleCognitoLogin = useCallback(async () => {
+        try {
+            const result = await cognitoSignIn(email, password)
+
+            if (result.success) {
+                const syncResult = await syncUserWithBackend(
+                    result.user!,
+                    result.token!,
+                    false // isSignup
+                )
+
+                if (syncResult.success) {
+                    const expiryTime = result.expiresAt
+                        ? result.expiresAt * 1000
+                        : Date.now() + 60 * 60 * 1000
+
+                    localStorage.setItem('dbx_auth_token', result.token!)
+                    localStorage.setItem('dbx_refresh_token', result.refreshToken || '')
+                    localStorage.setItem('dbx_token_expiry', expiryTime.toString())
+                    localStorage.setItem('dbx_token_type', 'cognito')
+                    localStorage.setItem('dbx_user_info', JSON.stringify(syncResult.user))
+
+                    setLoginSuccess(true)
+                    setTimeout(() => window.location.reload(), 1500)
+                } else {
+                    throw new Error(syncResult.error || 'Backend sync failed')
+                }
+            } else {
+                throw new Error(result.error || 'Login failed')
+            }
+        } catch (error) {
+            throw error
+        }
+    }, [email, password])
 
     /**
      * Handle token received from Firebase authentication
@@ -164,14 +275,20 @@ export function Login({ onSuccess }: LoginProps) {
             return
         }
 
-        if (!password || password.length < 6) {
-            setErrorMessage('Password must be at least 6 characters.')
+        if (!password || password.length < 8) {
+            setErrorMessage('Password must be at least 8 characters.')
             return
         }
 
-        if (authMode === 'signup' && password !== confirmPassword) {
-            setErrorMessage('Passwords do not match.')
-            return
+        if (authMode === 'signup') {
+            if (password !== confirmPassword) {
+                setErrorMessage('Passwords do not match.')
+                return
+            }
+            if (!firstName || !lastName) {
+                setErrorMessage('Please enter your first and last name.')
+                return
+            }
         }
 
         setIsAuthenticating(true)
@@ -179,31 +296,59 @@ export function Login({ onSuccess }: LoginProps) {
         setAuthLoadingMessage(authMode === 'login' ? 'Signing in...' : 'Creating account...')
 
         try {
-            // Use Firebase for authentication
-            let result
-            if (authMode === 'login') {
-                result = await signInWithEmail(email, password)
+            if (useCognito) {
+                // Use Cognito for authentication
+                if (authMode === 'login') {
+                    await handleCognitoLogin()
+                } else {
+                    // Signup flow with Cognito
+                    const result = await cognitoSignUp(email, password, {
+                        firstName,
+                        lastName,
+                        genderId: genderId ? parseInt(genderId) : null,
+                        profilePicUrl: null,
+                    })
+
+                    if (result.success) {
+                        if (result.nextStep === 'CONFIRM_SIGN_UP') {
+                            setCurrentView('verification')
+                            setPendingVerificationEmail(email)
+                            setPendingVerificationUsername(result.username)
+                            setPendingUserData(result.user)
+                            setPendingPassword(password)
+                            setIsAuthenticating(false)
+                        }
+                    } else {
+                        throw new Error(result.error || 'Sign up failed')
+                    }
+                }
             } else {
-                result = await signUpWithEmail(email, password)
-            }
+                // Use Firebase for authentication
+                let result
+                if (authMode === 'login') {
+                    result = await signInWithEmail(email, password)
+                } else {
+                    result = await signUpWithEmail(email, password)
+                }
 
-            if (!result.success) {
-                throw new Error(result.error || 'Authentication failed')
-            }
+                if (!result.success) {
+                    throw new Error(result.error || 'Authentication failed')
+                }
 
-            // Handle token received from Firebase
-            await handleTokenReceived(
-                result.token!,
-                result.refreshToken || null,
-                result.user!,
-                authMode === 'signup'
-            )
+                // Handle token received from Firebase
+                await handleTokenReceived(
+                    result.token!,
+                    result.refreshToken || null,
+                    result.user!,
+                    authMode === 'signup'
+                )
+            }
 
         } catch (error) {
             setIsAuthenticating(false)
             setErrorMessage(error instanceof Error ? error.message : 'Authentication failed. Please try again.')
         }
-    }, [email, password, confirmPassword, authMode, termsAccepted, handleTokenReceived])
+    }, [email, password, confirmPassword, firstName, lastName, genderId, authMode, termsAccepted, useCognito, handleTokenReceived, handleCognitoLogin])
 
     // Handle Google login
     const handleGoogleLogin = useCallback(async () => {
@@ -349,6 +494,49 @@ export function Login({ onSuccess }: LoginProps) {
                         />
                         <LuMail className="input-icon" />
                     </div>
+
+                    {!isLogin && useCognito && (
+                        <>
+                            <div className="input-group">
+                                <input
+                                    type="text"
+                                    className="auth-input"
+                                    placeholder="First Name *"
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
+                                    disabled={isAuthenticating}
+                                    required
+                                />
+                            </div>
+
+                            <div className="input-group">
+                                <input
+                                    type="text"
+                                    className="auth-input"
+                                    placeholder="Last Name *"
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
+                                    disabled={isAuthenticating}
+                                    required
+                                />
+                            </div>
+
+                            <div className="input-group">
+                                <select
+                                    className="auth-input"
+                                    value={genderId}
+                                    onChange={(e) => setGenderId(e.target.value)}
+                                    disabled={isAuthenticating}
+                                >
+                                    <option value="">Gender (Optional)</option>
+                                    <option value="1">Male</option>
+                                    <option value="2">Female</option>
+                                    <option value="3">Other</option>
+                                    <option value="4">Prefer not to say</option>
+                                </select>
+                            </div>
+                        </>
+                    )}
 
                     <div className="input-group">
                         <input
@@ -546,6 +734,19 @@ export function Login({ onSuccess }: LoginProps) {
             </p>
         </>
     )
+
+    // Show verification screen if on verification view
+    if (currentView === 'verification') {
+        return (
+            <VerificationCode
+                email={pendingVerificationEmail!}
+                onVerify={handleVerifyCode}
+                onResend={handleResendCode}
+                onBack={goBackToOptions}
+                isDarkTheme={true}
+            />
+        )
+    }
 
     return (
         <div className="login-container dark">
