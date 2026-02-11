@@ -15,6 +15,8 @@ import { z } from 'zod'
 import { orpc, ORPCError } from '~/orpc'
 import consola from 'consola'
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime'
+import { NodeHttpHandler } from '@smithy/node-http-handler'
+import https from 'node:https'
 import {
     createDatabaseQueryTool,
     createSchemaInspectionTool,
@@ -85,6 +87,7 @@ const aiQuerySchema = z.object({
     // Think mode
     force_model: z.string().optional(), // 'auto', 'simple', 'complex'
     use_thinking_mode: z.boolean().optional(), // Force think mode on/off
+    useTools: z.boolean().optional(), // Enable tool calling
 
     // Credentials for non-server-side providers
     AWS_ACCESS_KEY_ID: z.string().optional(),
@@ -358,6 +361,11 @@ async function callAWSBedrock(
                 accessKeyId: accessKeyId.trim(),
                 secretAccessKey: secretAccessKey.trim(),
             },
+            requestHandler: new NodeHttpHandler({
+                connectionTimeout: 5000,
+                socketTimeout: 30000,
+                httpsAgent: new https.Agent({ keepAlive: true }),
+            }),
         })
 
         // Create request body
@@ -441,10 +449,13 @@ async function callDBXAgent(
     }
 
     try {
+        // Instruction to prioritize business tables and use schema qualification
+        const systemInstruction = "When writing SQL queries:\n1. Prioritize standard business tables over internal system tables or vector store tables (like langchain_pg_collection).\n2. ALWAYS qualify table names with the schema name (e.g. 'app.patient' instead of just 'patient') to avoid ambiguity."
+
         // Include schema context ahead of the user's query when provided
         const prompt = schemaContext
-            ? `${schemaContext}\n\n${query}`
-            : query
+            ? `${systemInstruction}\n\n${schemaContext}\n\n${query}`
+            : `${systemInstruction}\n\n${query}`
 
         // Build request body EXACTLY like SUMR
         const body: Record<string, unknown> = {
@@ -483,26 +494,36 @@ async function callDBXAgent(
         }
 
         consola.info(`🚀 Calling DBX Multi-Service Inference${useThinking ? ' [THINK MODE]' : ''}`)
+        consola.info(`   URL: ${MAIN_SERVER_URL}/llm-inference/dbx-multi-service-inference`)
         consola.info(`   Model: ${model_name}`)
         consola.info(`   Prompt length: ${prompt.length} chars`)
+        consola.info(`   Auth token: ${authToken.substring(0, 20)}...`)
         if (connectionId) consola.info(`   Connection ID: ${connectionId}`)
         if (tables?.length) consola.info(`   Tables: ${tables.slice(0, 10).join(', ')}${tables.length > 10 ? ` (+${tables.length - 10} more)` : ''}`)
         if (schemaTableIds?.length) consola.info(`   Schema table IDs: ${schemaTableIds.slice(0, 10).join(', ')}${schemaTableIds.length > 10 ? ` (+${schemaTableIds.length - 10} more)` : ''}`)
         if (tools?.length) consola.info(`   Tools: ${tools.map(t => t.name).join(', ')}`)
 
-        // Make request with timeout
+        // Make request with timeout (60 seconds for AI inference)
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+        const timeout = setTimeout(() => controller.abort(), 60000) // 60 second timeout
 
-        let inferenceResponse = await fetch(`${MAIN_SERVER_URL}/llm-inference/dbx-multi-service-inference`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`,
-            },
-            body: JSON.stringify(body),
-            signal: controller.signal
-        })
+        consola.info(`📤 Sending request to DBX Agent...`)
+        let inferenceResponse
+        try {
+            inferenceResponse = await fetch(`${MAIN_SERVER_URL}/llm-inference/dbx-multi-service-inference`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal
+            })
+        } catch (fetchError) {
+            clearTimeout(timeout)
+            consola.error(`❌ Fetch error:`, fetchError)
+            throw fetchError
+        }
 
         clearTimeout(timeout)
 
@@ -610,10 +631,23 @@ async function callDBXAgent(
             sql: sql || undefined,
         }
     } catch (error) {
-        consola.error('DBX Agent error:', error instanceof Error ? error.message : error)
+        consola.error('DBX Agent error:', error)
+
+        // Better error message for HTTP2 issues
+        let errorMessage = 'DBX Agent request failed'
+        if (error instanceof Error) {
+            if (error.message.includes('http2') || error.message.includes('HTTP/2')) {
+                errorMessage = 'Network error: Unable to connect to DBX Agent server. Please check your internet connection.'
+            } else if (error.name === 'AbortError') {
+                errorMessage = 'Request timeout: The AI service took too long to respond. Please try again.'
+            } else {
+                errorMessage = error.message
+            }
+        }
+
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'DBX Agent request failed',
+            error: errorMessage,
         }
     }
 }
@@ -728,7 +762,8 @@ export const query = orpc
         if (schema) {
             schemaContext = `Schema: ${schema}`
             if (tables && tables.length > 0) {
-                schemaContext += `\nTables: ${tables.join(', ')}`
+                const tableNames = schema ? tables.map(t => `${schema}.${t}`) : tables
+                schemaContext += `\nTables: ${tableNames.join(', ')}`
             }
         }
 
@@ -799,16 +834,9 @@ export const query = orpc
 
             case 'dbx-agent':
             default: {
-                // Extract auth token
+                // Extract auth token (optional - guest token will be generated if missing)
                 const authHeader = context?.headers?.get?.('authorization') || ''
-                const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-
-                if (!token) {
-                    return {
-                        success: false,
-                        error: 'Authentication required for DBX Agent.',
-                    }
-                }
+                const token = authHeader.replace(/^Bearer\s+/i, '').trim() || 'guest_token_' + Math.random().toString(36).substr(2, 9)
 
                 // Validate model name
                 let modelName = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' // Default

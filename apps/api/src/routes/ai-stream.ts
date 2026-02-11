@@ -99,9 +99,9 @@ app.post('/query-stream', async (c) => {
         OPENAI_API_KEY
     } = body
 
-    // Extract auth token
+    // Extract auth token (optional - guest token will be generated if missing)
     const authHeader = c.req.header('authorization') || ''
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim() || 'guest_token_' + Math.random().toString(36).substr(2, 9)
 
     const serviceId = getServiceId(provider)
 
@@ -515,10 +515,11 @@ Remember: Be concise. Users want results, not explanations.`
                                 // Format a summary of the result for display
                                 let responseSummary = 'Completed successfully'
                                 let resultData = null
+                                let sqlForDisplay = toolResult.sql || null
 
                                 if (toolResult.error) {
                                     responseSummary = toolResult.error
-                                } else if (toolName === 'execute_sql_query' && toolResult.data) {
+                                } else if ((toolName === 'execute_sql_query' || toolName === 'select_data') && toolResult.data) {
                                     // For SQL queries, include the actual data in the response
                                     const rows = Array.isArray(toolResult.data) ? toolResult.data : toolResult.data.rows || []
                                     const rowCount = rows.length
@@ -551,7 +552,8 @@ Remember: Be concise. Users want results, not explanations.`
                                     toolUseId: toolUse.toolUseId,
                                     success: !toolResult.error,
                                     response: responseSummary,
-                                    data: resultData // Include actual data for display
+                                    data: resultData, // Include actual data for display
+                                    sql: sqlForDisplay // Include SQL for select_data and other tools
                                 })}\n\n`)
 
                                 // Truncate large results to avoid timeouts
@@ -782,18 +784,11 @@ app.post('/query', async (c) => {
         session_id?: string
     }
 
-    const { query, connection_id, database, schema, tables, model, provider = 'dbx-agent', session_id } = body
+    const { query, connection_id, database, schema, tables, model, provider = 'bedrock', session_id } = body
 
-    // Extract auth token
+    // Extract auth token (optional - guest token will be generated if missing)
     const authHeader = c.req.header('authorization') || ''
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-
-    if (!token && provider === 'dbx-agent') {
-        return c.json({
-            success: false,
-            error: 'Authentication required for DBX Agent'
-        }, 401)
-    }
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim() || 'guest_token_' + Math.random().toString(36).substr(2, 9)
 
     try {
         consola.info(`🔵 AI query: "${query.substring(0, 50)}..."`)

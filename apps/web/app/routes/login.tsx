@@ -1,5 +1,4 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useAuth, Login } from '~/features/auth'
 import { useEffect } from 'react'
 
 export const Route = createFileRoute('/login')({
@@ -7,23 +6,16 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-    const { isAuthenticated, isLoading } = useAuth()
     const navigate = useNavigate()
 
-    // Redirect to app if already authenticated
+    // Auto-redirect to app (no login required)
     useEffect(() => {
-        if (isAuthenticated && !isLoading) {
-            navigate({ to: '/app' })
-        }
-    }, [isAuthenticated, isLoading, navigate])
+        navigate({ to: '/app' })
+    }, [navigate])
 
-    if (isLoading) {
-        return (
-            <div className="query-main-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ color: '#fff', fontSize: '18px' }}>Loading...</div>
-            </div>
-        )
-    }
-
-    return <Login onSuccess={() => navigate({ to: '/app' })} />
+    return (
+        <div className="query-main-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ color: '#fff', fontSize: '18px' }}>Redirecting...</div>
+        </div>
+    )
 }

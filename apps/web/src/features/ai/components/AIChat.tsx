@@ -1,31 +1,28 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, X, Loader2, Copy, Check, Play, AlertCircle, RotateCcw, Edit2, ThumbsUp, ThumbsDown, Plus, MoreVertical, Database, ChevronDown, ChevronRight, FileSearch, BarChart3 } from 'lucide-react'
-import aiService from '../services/aiService'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Send, X, Sparkles, Settings, RefreshCw, AlertCircle, Play, Copy, Check } from 'lucide-react'
 import {
     PROVIDERS,
     MODELS,
     getModelsByProvider,
     getProviderById,
     providerRequiresCredentials,
-    getCredentialFieldsForProvider
 } from '../services/aiConfig'
-import { HierarchicalSelector } from './HierarchicalSelector'
-import { renderFullMarkdown } from '../utils/fullMarkdownRenderer'
-import { highlightSQL } from '../utils/sqlHighlighter'
-import { autoSaveMessages, getCurrentSessionId, createNewSession, loadSession } from '../services/aiChatStorage'
+import aiService from '../services/aiService'
 import './ai-chat.css'
-import './hierarchical-selector.css'
 
-// Streaming block types for tool display
-interface StreamingBlock {
-    type: 'thinking' | 'tool' | 'response' | 'sql' | 'error'
-    content?: string
-    toolName?: string
-    args?: Record<string, unknown>
-    response?: string
-    success?: boolean
-    sql?: string
-    data?: unknown // Tool result data (e.g., query results)
+interface AIChatProps {
+    isOpen: boolean
+    onClose: () => void
+    onRunQuery?: (sql: string) => void
+    connectionId?: string
+    externalConnectionId?: string
+    schema?: string
+    tables?: string[]
+    tableDetails?: any
+    isDarkTheme?: boolean
+    worksheets?: { id: string; title: string }[]
+    activeWorksheetId?: string
+    onSelectWorksheet?: (id: string) => void
 }
 
 interface Message {
@@ -34,143 +31,39 @@ interface Message {
     content: string
     sql?: string
     timestamp: Date
-    isError?: boolean
-    isStreaming?: boolean
-    streamingBlocks?: StreamingBlock[] // Save streaming blocks with message
 }
 
-/**
- * Get user-friendly tool display name
- */
-function getToolDisplayName(toolName: string): string {
-    const toolNameLower = (toolName || '').toLowerCase()
-
-    if (toolNameLower === 'get_table_schema' || toolNameLower === 'inspect_database_schema') {
-        return 'Reading Schema'
-    } else if (toolNameLower === 'execute_sql_query') {
-        return 'Executing Query'
-    } else if (toolNameLower === 'generate_bar_graph' || toolNameLower.includes('graph') || toolNameLower.includes('chart')) {
-        return 'Generating Visualization'
-    } else if (toolNameLower === 'get_enums') {
-        return 'Getting Enums'
-    } else if (toolNameLower === 'select_data') {
-        return 'Selecting Data'
-    }
-
-    return toolName
-}
-
-/**
- * Get icon for tool type
- */
-function getToolIcon(toolName: string) {
-    const toolNameLower = (toolName || '').toLowerCase()
-
-    if (toolNameLower === 'get_table_schema' || toolNameLower === 'inspect_database_schema') {
-        return <FileSearch size={14} />
-    } else if (toolNameLower === 'execute_sql_query') {
-        return <Database size={14} />
-    } else if (toolNameLower === 'generate_bar_graph' || toolNameLower.includes('graph') || toolNameLower.includes('chart')) {
-        return <BarChart3 size={14} />
-    }
-
-    return <Database size={14} />
-}
-
-interface WorksheetInfo {
-    id: string
-    title: string
-}
-
-interface AIChatProps {
-    isOpen: boolean
-    onClose: () => void
-    onRunQuery?: (sql: string) => void
-    connectionId?: string
-    externalConnectionId?: string // Server-side connection ID for AI
-    schema?: string
-    tables?: string[]
-    tableDetails?: {
-        tableName: string
-        schema?: string
-        columns?: Array<{ name: string; type?: string; nullable?: boolean; isPrimaryKey?: boolean }>
-        sampleRows?: Array<Record<string, any>>
-    }
-    isDarkTheme?: boolean
-    worksheets?: WorksheetInfo[]
-    activeWorksheetId?: string
-    onSelectWorksheet?: (worksheetId: string) => void
-    connectionName?: string
-}
-
-/**
- * Format timestamp as HH:MM
- */
-function formatTime(date: Date): string {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-/**
- * Extract SQL from response text
- */
-function extractSQL(text: string): string | null {
-    if (!text) return null
-
-    // Try to extract from ```sql ... ``` blocks
-    const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i)
-    if (sqlBlockMatch && sqlBlockMatch[1]) {
-        return sqlBlockMatch[1].trim()
-    }
-
-    // Try to extract from ``` ... ``` blocks
-    const codeBlockMatch = text.match(/```\s*([\s\S]*?)\s*```/)
-    if (codeBlockMatch && codeBlockMatch[1]) {
-        const content = codeBlockMatch[1].trim()
-        // Check if it looks like SQL
-        if (/^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH)\s/i.test(content)) {
-            return content
-        }
-    }
-
-    // Try to find SQL statement in text
-    const sqlMatch = text.match(/(SELECT|INSERT|UPDATE|DELETE|CREATE|WITH)[\s\S]*?;/i)
-    if (sqlMatch) {
-        return sqlMatch[0].trim()
-    }
-
-    return null
-}
-
-export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConnectionId, schema, tables, tableDetails, isDarkTheme = true, worksheets = [], activeWorksheetId, onSelectWorksheet, connectionName }: AIChatProps) {
+export function AIChat({
+    isOpen,
+    onClose,
+    connectionId,
+    externalConnectionId,
+    schema,
+    tables,
+    tableDetails,
+    onRunQuery,
+    isDarkTheme = true
+}: AIChatProps) {
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-    const [copiedId, setCopiedId] = useState<string | null>(null)
     const [showSettings, setShowSettings] = useState(false)
-    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({})
-    const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
-    const [tokenCount, setTokenCount] = useState<number>(0)
+    const [copiedId, setCopiedId] = useState<string | null>(null)
 
-    // Streaming state for tool display
-    const [isStreaming, setIsStreaming] = useState(false)
-    const [streamingContent, setStreamingContent] = useState('')
-    const [streamingBlocks, setStreamingBlocks] = useState<StreamingBlock[]>([])
-    const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
-    const streamingBlocksRef = useRef<StreamingBlock[]>([])
+    const inputRef = useRef<HTMLTextAreaElement>(null)
+    const messagesEndRef = useRef<HTMLDivElement>(null)
 
-    // Schema/Table selection state
-    const [selectedSchemaId, setSelectedSchemaId] = useState<string | number>('')
-    const [selectedTableId, setSelectedTableId] = useState<string | number>('')
-    const [schemas, setSchemas] = useState<Array<{ schema_id: string | number, schema_name: string }>>([])
-    const [loadingSchemas, setLoadingSchemas] = useState(false)
-    const [loadingTables, setLoadingTables] = useState(false)
+    // Scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [messages, isLoading])
 
     // AI Settings
     const [selectedProvider, setSelectedProvider] = useState(
-        localStorage.getItem('ai_selected_provider') || 'openai'
+        localStorage.getItem('ai_selected_provider') || 'dbx-agent'
     )
     const [selectedModelId, setSelectedModelId] = useState(
-        parseInt(localStorage.getItem('ai_selected_model_id') || '201', 10) // GPT-4o
+        parseInt(localStorage.getItem('ai_selected_model_id') || '801', 10)
     )
 
     // Credentials state
@@ -182,18 +75,16 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
         ANTHROPIC_API_KEY: localStorage.getItem('ai_anthropic_api_key') || '',
     })
 
-    const messagesEndRef = useRef<HTMLDivElement>(null)
-    const inputRef = useRef<HTMLTextAreaElement>(null)
-    const [currentSessionId, setCurrentSessionId] = useState<string>('')
 
-    const providerModels = useMemo(() => getModelsByProvider(selectedProvider), [selectedProvider])
+
+    // Get provider models and info
+    const providerModels = getModelsByProvider(selectedProvider)
     const currentProvider = getProviderById(selectedProvider)
     const currentModel = MODELS.find(m => m.modelId === selectedModelId)
     const requiresCredentials = providerRequiresCredentials(selectedProvider)
-    const credentialFields = getCredentialFieldsForProvider(selectedProvider)
 
     // Check if credentials are configured
-    const hasCredentials = useMemo(() => {
+    const hasCredentials = useCallback(() => {
         if (!requiresCredentials) return true
 
         switch (selectedProvider) {
@@ -208,350 +99,337 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
         }
     }, [selectedProvider, credentials, requiresCredentials])
 
-    // Load chat history on mount
-    useEffect(() => {
-        const sessionId = getCurrentSessionId()
-        setCurrentSessionId(sessionId)
+    const handleSaveSettings = async () => {
+        // Save to aiService (which also saves to localStorage)
+        const currentModel = MODELS.find(m => m.modelId === selectedModelId)
 
-        const session = loadSession(sessionId)
-        if (session && session.messages.length > 0) {
-            setMessages(session.messages)
-        }
-    }, [])
-
-    // Auto-save messages when they change
-    useEffect(() => {
-        if (messages.length > 0) {
-            autoSaveMessages(messages, connectionId, schema)
-        }
-    }, [messages, connectionId, schema])
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
-
-    useEffect(() => {
-        if (isOpen) {
-            inputRef.current?.focus()
-        }
-    }, [isOpen])
-
-    // Update model when provider changes
-    useEffect(() => {
-        const models = getModelsByProvider(selectedProvider)
-        if (!models.find(m => m.modelId === selectedModelId) && models.length > 0) {
-            setSelectedModelId(models[0].modelId)
-        }
-    }, [selectedProvider, selectedModelId])
-
-    const handleSubmit = useCallback(async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!input.trim() || isLoading) return
-
-        // Check credentials for providers that require them
-        if (requiresCredentials && !hasCredentials) {
-            setShowSettings(true)
-            return
-        }
-
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: input.trim(),
-            timestamp: new Date(),
-        }
-
-        setMessages(prev => [...prev, userMessage])
-        setInput('')
-        setIsLoading(true)
-        setIsStreaming(true)
-
-        // Create placeholder assistant message for streaming
-        const assistantMessageId = (Date.now() + 1).toString()
-        const assistantMessage: Message = {
-            id: assistantMessageId,
-            role: 'assistant',
-            content: '',
-            timestamp: new Date(),
-            isStreaming: true,
-        }
-
-        // Add assistant message to show streaming immediately
-        setMessages(prev => [...prev, assistantMessage])
-
-        // Reset streaming state for new message
-        setStreamingBlocks([])
-        setStreamingContent('')
-        streamingBlocksRef.current = []
-        setExpandedTools({}) // Reset expanded state for new conversation
-
-        try {
-            // Update AI service configuration
-            aiService.setProvider(selectedProvider)
-            aiService.updateConfiguration({
-                selectedProvider,
-                selectedModelId,
-                selectedModel: currentModel?.modelName,
-                ...credentials
-            })
-
-            // Use streaming endpoint with tool callbacks
-            await aiService.sendMessageStreamingWithTools(
-                userMessage.content,
-                {
-                    onChunk: (chunk) => {
-                        setStreamingContent(prev => prev + chunk)
-                        // Update or add response block
-                        setStreamingBlocks(prev => {
-                            const lastBlock = prev[prev.length - 1]
-                            if (lastBlock?.type === 'response') {
-                                const newBlocks = [...prev]
-                                newBlocks[newBlocks.length - 1] = {
-                                    ...lastBlock,
-                                    content: (lastBlock.content || '') + chunk
-                                }
-                                streamingBlocksRef.current = newBlocks
-                                return newBlocks
-                            } else {
-                                const newBlocks = [...prev, { type: 'response' as const, content: chunk }]
-                                streamingBlocksRef.current = newBlocks
-                                return newBlocks
-                            }
-                        })
-
-                        // Also update the assistant message content for fallback display
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? { ...msg, content: msg.content + chunk }
-                                : msg
-                        ))
-                    },
-                    onToolCall: (toolName, args) => {
-                        setStreamingBlocks(prev => {
-                            const newBlock: StreamingBlock = {
-                                type: 'tool',
-                                toolName,
-                                args,
-                                content: `Calling ${getToolDisplayName(toolName)}...`,
-                                // Extract SQL from execute_sql_query tool
-                                sql: toolName === 'execute_sql_query' && args?.query ? String(args.query) : undefined
-                            }
-                            const newBlocks = [...prev, newBlock]
-                            streamingBlocksRef.current = newBlocks
-                            return newBlocks
-                        })
-                    },
-                    onToolResponse: (toolName, success, response, data) => {
-                        setStreamingBlocks(prev => {
-                            const newBlocks = [...prev]
-                            // Find the last tool block with this name and update it
-                            for (let i = newBlocks.length - 1; i >= 0; i--) {
-                                if (newBlocks[i].type === 'tool' && newBlocks[i].toolName === toolName && !newBlocks[i].response) {
-                                    newBlocks[i] = {
-                                        ...newBlocks[i],
-                                        success,
-                                        response,
-                                        data, // Store the actual result data
-                                        content: success ? `${getToolDisplayName(toolName)} completed` : `${getToolDisplayName(toolName)} failed`
-                                    }
-                                    break
-                                }
-                            }
-                            streamingBlocksRef.current = newBlocks
-                            return newBlocks
-                        })
-                    },
-                    onComplete: (fullMessage, sql) => {
-                        setIsStreaming(false)
-                        setIsLoading(false)
-
-                        // Extract SQL from tool blocks if not provided in response
-                        let finalSQL = sql
-                        if (!finalSQL) {
-                            // Look for SQL in execute_sql_query tool blocks
-                            const sqlTool = streamingBlocksRef.current.find(
-                                b => b.type === 'tool' && b.toolName === 'execute_sql_query' && b.sql
-                            )
-                            if (sqlTool?.sql) {
-                                finalSQL = sqlTool.sql
-                            }
-                        }
-
-                        // Update the existing assistant message instead of creating a new one
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? {
-                                    ...msg,
-                                    content: fullMessage,
-                                    sql: finalSQL,
-                                    isStreaming: false,
-                                    streamingBlocks: [...streamingBlocksRef.current] // Preserve tools for display
-                                }
-                                : msg
-                        ))
-
-                        // Don't clear streaming blocks immediately - they'll be preserved in the message
-                        // Only clear when starting a new message
-                    },
-                    onError: (error) => {
-                        setIsStreaming(false)
-                        setIsLoading(false)
-
-                        // Add error to streaming blocks
-                        setStreamingBlocks(prev => {
-                            const newBlocks = [...prev, { type: 'error' as const, content: error }]
-                            streamingBlocksRef.current = newBlocks
-                            return newBlocks
-                        })
-
-                        // Update the existing assistant message with error instead of creating new one
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? {
-                                    ...msg,
-                                    content: error,
-                                    isError: true,
-                                    isStreaming: false,
-                                    streamingBlocks: [...streamingBlocksRef.current]
-                                }
-                                : msg
-                        ))
-                    }
-                },
-                {
-                    connectionId,
-                    externalConnectionId,
-                    schema,
-                    tables,
-                    tableDetails,
-                }
-            )
-        } catch (error) {
-            setIsStreaming(false)
-            setIsLoading(false)
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: error instanceof Error ? error.message : 'Sorry, I encountered an error. Please try again.',
-                timestamp: new Date(),
-                isError: true,
-            }
-            setMessages(prev => [...prev, errorMessage])
-            setStreamingBlocks([])
-            setStreamingContent('')
-        }
-    }, [input, isLoading, isStreaming, selectedProvider, selectedModelId, currentModel, connectionId, externalConnectionId, schema, tables, credentials, requiresCredentials, hasCredentials])
-
-    const handleCopySQL = async (sql: string, messageId: string) => {
-        await navigator.clipboard.writeText(sql)
-        setCopiedId(messageId)
-        setTimeout(() => setCopiedId(null), 2000)
-    }
-
-    const handleCopyMessage = async (content: string, messageId: string) => {
-        await navigator.clipboard.writeText(content)
-        setCopiedId(messageId)
-        setTimeout(() => setCopiedId(null), 2000)
-    }
-
-    const handleRetry = useCallback((messageContent: string) => {
-        setInput(messageContent)
-        inputRef.current?.focus()
-    }, [])
-
-    const handleEdit = useCallback((messageId: string, content: string) => {
-        setEditingMessageId(messageId)
-        setInput(content)
-        inputRef.current?.focus()
-    }, [])
-
-    const handleFeedback = useCallback((messageId: string, type: 'up' | 'down') => {
-        setFeedbackGiven(prev => ({
-            ...prev,
-            [messageId]: prev[messageId] === type ? undefined as any : type
-        }))
-        // TODO: Send feedback to backend
-    }, [])
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            handleSubmit(e)
-        }
-    }
-
-    const handleSaveSettings = useCallback(() => {
-        // Save to localStorage
-        localStorage.setItem('ai_selected_provider', selectedProvider)
-        localStorage.setItem('ai_selected_model_id', String(selectedModelId))
-        localStorage.setItem('ai_aws_access_key_id', credentials.AWS_ACCESS_KEY_ID)
-        localStorage.setItem('ai_aws_secret_access_key', credentials.AWS_SECRET_ACCESS_KEY)
-        localStorage.setItem('ai_aws_region', credentials.AWS_REGION)
-        localStorage.setItem('ai_openai_api_key', credentials.OPENAI_API_KEY)
-        localStorage.setItem('ai_anthropic_api_key', credentials.ANTHROPIC_API_KEY)
-
-        // Update AI service
-        aiService.setProvider(selectedProvider)
-        aiService.updateConfiguration({
+        await aiService.setCredentials({
             selectedProvider,
-            selectedModelId,
             selectedModel: currentModel?.modelName,
-            ...credentials
-        })
-
-        // Save to server
-        aiService.setCredentials({
-            selectedProvider,
             selectedModelId,
-            selectedModel: currentModel?.modelName,
-            ...credentials
+            AWS_ACCESS_KEY_ID: credentials.AWS_ACCESS_KEY_ID,
+            AWS_SECRET_ACCESS_KEY: credentials.AWS_SECRET_ACCESS_KEY,
+            AWS_REGION: credentials.AWS_REGION,
+            OPENAI_API_KEY: credentials.OPENAI_API_KEY,
+            ANTHROPIC_API_KEY: credentials.ANTHROPIC_API_KEY,
         })
 
         setShowSettings(false)
-    }, [selectedProvider, selectedModelId, currentModel, credentials])
+    }
 
-    const handleClearChat = useCallback(() => {
-        setMessages([])
-        const newSessionId = createNewSession()
-        setCurrentSessionId(newSessionId)
-    }, [])
+    const handleCopy = (text: string, id: string) => {
+        navigator.clipboard.writeText(text)
+        setCopiedId(id)
+        setTimeout(() => setCopiedId(null), 2000)
+    }
 
     if (!isOpen) return null
 
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!input.trim() || isLoading) return
+
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: input,
+            timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, userMsg])
+        setInput('')
+        setIsLoading(true)
+
+        try {
+            const response = await aiService.sendMessage(userMsg.content, {
+                connectionId,
+                externalConnectionId,
+                schema,
+                tables,
+                tableDetails,
+            })
+
+            if (response.success) {
+                const assistantMsg: Message = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: response.message || 'No response content',
+                    sql: response.sql,
+                    timestamp: new Date(),
+                }
+                setMessages(prev => [...prev, assistantMsg])
+            } else {
+                const errorMsg: Message = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: 'Error: ' + (response.error || 'Unknown error'),
+                    timestamp: new Date(),
+                }
+                setMessages(prev => [...prev, errorMsg])
+            }
+        } catch (err: any) {
+            const errorMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: 'Error: ' + (err.message || 'Failed to send message'),
+                timestamp: new Date(),
+            }
+            setMessages(prev => [...prev, errorMsg])
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSubmit(e as any)
+        }
+    }
+
     const themeClass = isDarkTheme ? 'dark-theme' : 'light-theme'
 
-    return (
-        <div className={`workspace-ai-chat ${themeClass}`}>
-            {/* Header */}
-            <div className="ai-header">
-                <div className="ai-header-left">
-                    <h3>Copilot Chat</h3>
+    // Helper to render message content with SQL Extraction
+    const renderMessageContent = (msg: Message) => {
+        if (msg.role === 'user') {
+            return <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+        }
+
+        // If specific SQL field exists, use it
+        if (msg.sql) {
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Explanation text hidden as per user request */}
+                    <div style={{
+                        marginTop: '8px',
+                        borderRadius: '6px',
+                        overflow: 'hidden',
+                        border: '1px solid #3a3a3a',
+                        background: '#1a1a1a'
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '6px 10px',
+                            background: '#252525',
+                            borderBottom: '1px solid #3a3a3a'
+                        }}>
+                            <span style={{ fontSize: '11px', color: '#9fb0c8', fontWeight: 600 }}>SQL Query</span>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                    onClick={() => handleCopy(msg.sql!, msg.id)}
+                                    title="Copy SQL"
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: copiedId === msg.id ? '#4ade80' : '#9fb0c8',
+                                        cursor: 'pointer',
+                                        padding: '2px 4px',
+                                        fontSize: '11px'
+                                    }}
+                                >
+                                    {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
+                                    {copiedId === msg.id ? 'Copied' : 'Copy'}
+                                </button>
+                                {onRunQuery && (
+                                    <button
+                                        onClick={() => onRunQuery(msg.sql!)}
+                                        title="Run Query"
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '4px',
+                                            background: '#4a9eff',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            color: '#fff',
+                                            cursor: 'pointer',
+                                            padding: '2px 8px',
+                                            fontSize: '11px',
+                                            fontWeight: 500
+                                        }}
+                                    >
+                                        <Play size={12} fill="currentColor" />
+                                        Run
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div style={{
+                            padding: '10px',
+                            fontSize: '12px',
+                            fontFamily: 'monospace',
+                            color: '#d4d4d4',
+                            overflowX: 'auto',
+                            whiteSpace: 'pre-wrap'
+                        }}>
+                            {msg.sql}
+                        </div>
+                    </div>
                 </div>
-                <div className="ai-header-actions">
+            )
+        }
+
+        // Parse markdown code blocks if no explicit SQL field
+        const parts = msg.content.split(/(```sql[\s\S]*?```)/g)
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {parts.map((part, index) => {
+                    if (part.startsWith('```sql')) {
+                        const code = part.replace(/```sql\n?/, '').replace(/```$/, '').trim()
+                        return (
+                            <div key={index} style={{
+                                marginTop: '4px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                border: '1px solid #3a3a3a',
+                                background: '#1a1a1a'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '6px 10px',
+                                    background: '#252525',
+                                    borderBottom: '1px solid #3a3a3a'
+                                }}>
+                                    <span style={{ fontSize: '11px', color: '#9fb0c8', fontWeight: 600 }}>SQL Query</span>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button
+                                            onClick={() => handleCopy(code, `${msg.id}-${index}`)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '4px',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: copiedId === `${msg.id}-${index}` ? '#4ade80' : '#9fb0c8',
+                                                cursor: 'pointer',
+                                                padding: '2px 4px',
+                                                fontSize: '11px'
+                                            }}
+                                        >
+                                            {copiedId === `${msg.id}-${index}` ? <Check size={12} /> : <Copy size={12} />}
+                                            {copiedId === `${msg.id}-${index}` ? 'Copied' : 'Copy'}
+                                        </button>
+                                        {onRunQuery && (
+                                            <button
+                                                onClick={() => onRunQuery(code)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: '4px',
+                                                    background: '#4a9eff',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    color: '#fff',
+                                                    cursor: 'pointer',
+                                                    padding: '2px 8px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 500
+                                                }}
+                                            >
+                                                <Play size={12} fill="currentColor" />
+                                                Run
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div style={{
+                                    padding: '10px',
+                                    fontSize: '12px',
+                                    fontFamily: 'monospace',
+                                    color: '#d4d4d4',
+                                    overflowX: 'auto',
+                                    whiteSpace: 'pre-wrap'
+                                }}>
+                                    {code}
+                                </div>
+                            </div>
+                        )
+                    }
+                    return <div key={index} style={{ whiteSpace: 'pre-wrap' }}>{part}</div>
+                })}
+            </div>
+        )
+    }
+
+    return (
+        <div className={`workspace-ai-chat ${themeClass}`} style={{
+            backgroundColor: '#1a1a1a',
+            color: '#e6eef8',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflow: 'hidden',
+        }}>
+            {/* Header */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 14px',
+                background: '#1f1f1f',
+                borderBottom: '1px solid #333',
+                flexShrink: 0,
+                gap: '12px',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sparkles size={16} color="#4a9eff" />
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff' }}>Copilot</h3>
+                    <span style={{ fontSize: '11px', color: '#9fb0c8', background: '#2a2a2a', border: '1px solid #3a3a3a', padding: '3px 8px', borderRadius: '4px', fontWeight: 500 }}>
+                        DBX Agent
+                    </span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
                     {messages.length > 0 && (
                         <button
-                            className="ai-header-btn"
-                            onClick={handleClearChat}
-                            title="New Chat"
+                            onClick={() => setMessages([])}
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid #3a3a3a',
+                                color: '#9fb0c8',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                            title="Clear Chat"
                         >
-                            <RotateCcw size={14} />
+                            <RefreshCw size={14} />
                         </button>
                     )}
                     <button
-                        className="ai-header-btn"
-                        onClick={handleClearChat}
-                        title="New Chat"
+                        onClick={() => setShowSettings(!showSettings)}
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid #3a3a3a',
+                            color: '#9fb0c8',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                        title="Settings"
                     >
-                        <Plus size={14} />
+                        <Settings size={14} />
                     </button>
                     <button
-                        className="ai-header-btn"
-                        onClick={() => setShowSettings(!showSettings)}
-                        title="Menu"
+                        onClick={onClose}
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid #3a3a3a',
+                            color: '#9fb0c8',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
                     >
-                        <MoreVertical size={14} />
-                    </button>
-                    <button className="ai-close-btn" onClick={onClose}>
                         <X size={16} />
                     </button>
                 </div>
@@ -559,12 +437,30 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
 
             {/* Settings Panel */}
             {showSettings && (
-                <div className="ai-settings-panel">
-                    <div className="ai-settings-group">
-                        <label>Provider</label>
+                <div style={{
+                    padding: '12px',
+                    background: '#2a2a2a',
+                    borderBottom: '1px solid #3a3a3a',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    flexShrink: 0,
+                }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>Provider</label>
                         <select
                             value={selectedProvider}
                             onChange={(e) => setSelectedProvider(e.target.value)}
+                            style={{
+                                padding: '8px 10px',
+                                fontSize: '13px',
+                                background: '#1a1a1a',
+                                color: '#d4d4d4',
+                                border: '1px solid #3a3a3a',
+                                borderRadius: '6px',
+                            }}
                         >
                             {PROVIDERS.map(p => (
                                 <option key={p.id} value={p.id}>
@@ -572,437 +468,22 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                                 </option>
                             ))}
                         </select>
-                        <span className="ai-settings-hint">{currentProvider?.description}</span>
+                        <span style={{ fontSize: '11px', color: '#9fb0c8' }}>{currentProvider?.description}</span>
                     </div>
 
-                    <div className="ai-settings-group">
-                        <label>Model</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>Model</label>
                         <select
                             value={selectedModelId}
                             onChange={(e) => setSelectedModelId(parseInt(e.target.value, 10))}
-                        >
-                            {providerModels.map(m => (
-                                <option key={m.modelId} value={m.modelId}>
-                                    {m.label}{m.isThinking ? ' (Extended Thinking)' : ''}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Provider-specific credentials */}
-                    {selectedProvider === 'bedrock' && (
-                        <div className="ai-credentials-section">
-                            <div className="ai-settings-group">
-                                <label>AWS Access Key ID</label>
-                                <input
-                                    type="text"
-                                    value={credentials.AWS_ACCESS_KEY_ID}
-                                    onChange={(e) => setCredentials(prev => ({ ...prev, AWS_ACCESS_KEY_ID: e.target.value }))}
-                                    placeholder="AKIA..."
-                                />
-                            </div>
-                            <div className="ai-settings-group">
-                                <label>AWS Secret Access Key</label>
-                                <input
-                                    type="password"
-                                    value={credentials.AWS_SECRET_ACCESS_KEY}
-                                    onChange={(e) => setCredentials(prev => ({ ...prev, AWS_SECRET_ACCESS_KEY: e.target.value }))}
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                            <div className="ai-settings-group">
-                                <label>AWS Region</label>
-                                <input
-                                    type="text"
-                                    value={credentials.AWS_REGION}
-                                    onChange={(e) => setCredentials(prev => ({ ...prev, AWS_REGION: e.target.value }))}
-                                    placeholder="us-east-1"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedProvider === 'openai' && (
-                        <div className="ai-credentials-section">
-                            <div className="ai-settings-group">
-                                <label>OpenAI API Key</label>
-                                <input
-                                    type="password"
-                                    value={credentials.OPENAI_API_KEY}
-                                    onChange={(e) => setCredentials(prev => ({ ...prev, OPENAI_API_KEY: e.target.value }))}
-                                    placeholder="sk-..."
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedProvider === 'claude' && (
-                        <div className="ai-credentials-section">
-                            <div className="ai-settings-group">
-                                <label>Anthropic API Key</label>
-                                <input
-                                    type="password"
-                                    value={credentials.ANTHROPIC_API_KEY}
-                                    onChange={(e) => setCredentials(prev => ({ ...prev, ANTHROPIC_API_KEY: e.target.value }))}
-                                    placeholder="sk-ant-..."
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedProvider === 'dbx-agent' && (
-                        <div className="ai-info-box">
-                            <AlertCircle size={14} />
-                            <span>DBX Agent uses server-side processing. No API keys required!</span>
-                        </div>
-                    )}
-
-                    <div className="ai-settings-actions">
-                        <button className="ai-settings-save" onClick={handleSaveSettings}>
-                            Save Settings
-                        </button>
-                        <button className="ai-settings-cancel" onClick={() => setShowSettings(false)}>
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Credential Warning */}
-            {requiresCredentials && !hasCredentials && !showSettings && (
-                <div className="ai-credential-warning">
-                    <AlertCircle size={16} />
-                    <span>
-                        {currentProvider?.name} requires API credentials.
-                        <button onClick={() => setShowSettings(true)}>Configure now</button>
-                    </span>
-                </div>
-            )}
-
-            {/* Content */}
-            <div className="ai-content">
-                {messages.length === 0 ? (
-                    <div className="ai-welcome">
-                        <span className="welcome-icon">✨</span>
-                        <div className="welcome-title">AI SQL Assistant</div>
-                        <p className="welcome-description">
-                            Describe what data you need and I'll generate SQL queries for you.
-                        </p>
-                        <div className="ai-features">
-                            <div className="feature-item">
-                                <span className="feature-icon">🔍</span>
-                                <span>Natural language to SQL</span>
-                            </div>
-                            <div className="feature-item">
-                                <span className="feature-icon">📊</span>
-                                <span>Schema-aware queries</span>
-                            </div>
-                            <div className="feature-item">
-                                <span className="feature-icon">⚡</span>
-                                <span>Query optimization</span>
-                            </div>
-                        </div>
-                        <div className="ai-examples">
-                            <p className="examples-title">Try asking:</p>
-                            <div className="example-queries">
-                                <button
-                                    className="example-query"
-                                    onClick={() => setInput('Show me all users who signed up last month')}
-                                >
-                                    Show me all users who signed up last month
-                                </button>
-                                <button
-                                    className="example-query"
-                                    onClick={() => setInput('What are the top 10 products by revenue?')}
-                                >
-                                    What are the top 10 products by revenue?
-                                </button>
-                                <button
-                                    className="example-query"
-                                    onClick={() => setInput('Count orders grouped by status')}
-                                >
-                                    Count orders grouped by status
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    messages.map(message => (
-                        <div key={message.id} className={`message ${message.role} ${message.isError ? 'error' : ''} ${message.isStreaming ? 'streaming' : ''}`}>
-                            <div className="message-content">
-                                {message.isError && (
-                                    <div className="error-header">
-                                        <AlertCircle size={16} />
-                                        <span>Error</span>
-                                    </div>
-                                )}
-
-                                {/* Show streaming blocks FIRST for assistant messages (real-time tool display) */}
-                                {/* Also show preserved streamingBlocks for completed messages in the same position */}
-                                {message.role === 'assistant' && (
-                                    (message.isStreaming && streamingBlocks.length > 0) ||
-                                    (!message.isStreaming && message.streamingBlocks && message.streamingBlocks.length > 0)
-                                ) && (
-                                        <div className="streaming-blocks">
-                                            {(message.isStreaming ? streamingBlocks : message.streamingBlocks || []).map((block, idx) => {
-                                                if (block.type === 'tool') {
-                                                    const toolKey = message.isStreaming ? `streaming-tool-${idx}` : `message-${message.id}-tool-${idx}`
-                                                    const isExpanded = expandedTools[toolKey] === true // Default collapsed
-                                                    const isExecuteQuery = block.toolName === 'execute_sql_query'
-                                                    const executedSQL = isExecuteQuery && block.args?.query ? String(block.args.query) : block.sql
-
-                                                    return (
-                                                        <div key={idx} className={`tool-block ${!message.isStreaming ? 'completed' : ''}`}>
-                                                            <div
-                                                                className={`tool-header ${block.success === undefined ? 'pending' : block.success ? 'success' : 'error'}`}
-                                                                onClick={() => setExpandedTools(prev => ({ ...prev, [toolKey]: !isExpanded }))}
-                                                            >
-                                                                <div className="tool-info">
-                                                                    {getToolIcon(block.toolName || '')}
-                                                                    <span className="tool-name">{getToolDisplayName(block.toolName || '')}</span>
-                                                                    {block.success === undefined && (
-                                                                        <Loader2 size={12} className="spin tool-spinner" />
-                                                                    )}
-                                                                    {block.success === true && (
-                                                                        <Check size={12} className="tool-success-icon" />
-                                                                    )}
-                                                                </div>
-                                                                <span className="tool-expand-icon">
-                                                                    {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                                                </span>
-                                                            </div>
-                                                            {isExpanded && (
-                                                                <div className="tool-details">
-                                                                    {/* Show SQL prominently for execute_sql_query */}
-                                                                    {executedSQL && (
-                                                                        <div className="tool-sql-section">
-                                                                            <div className="tool-sql-label">SQL Query</div>
-                                                                            <pre className="tool-sql-content">
-                                                                                <code>{highlightSQL(executedSQL)}</code>
-                                                                            </pre>
-                                                                            {/* Show copy/run buttons for completed tools */}
-                                                                            {!message.isStreaming && (
-                                                                                <div className="tool-sql-actions">
-                                                                                    <button
-                                                                                        className="sql-btn"
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation()
-                                                                                            handleCopySQL(executedSQL, `${message.id}-tool-${idx}`)
-                                                                                        }}
-                                                                                        title="Copy SQL"
-                                                                                    >
-                                                                                        {copiedId === `${message.id}-tool-${idx}` ? (
-                                                                                            <Check size={14} />
-                                                                                        ) : (
-                                                                                            <Copy size={14} />
-                                                                                        )}
-                                                                                    </button>
-                                                                                    {onRunQuery && (
-                                                                                        <button
-                                                                                            className="sql-btn run"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation()
-                                                                                                onRunQuery(executedSQL)
-                                                                                            }}
-                                                                                            title="Run Query"
-                                                                                        >
-                                                                                            <Play size={12} />
-                                                                                            Run
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                    {/* Show other arguments for non-SQL tools */}
-                                                                    {block.args && !executedSQL && (
-                                                                        <div className="tool-args">
-                                                                            <span className="tool-args-label">Arguments:</span>
-                                                                            <pre className="tool-args-content">
-                                                                                {String(JSON.stringify(block.args, null, 2))}
-                                                                            </pre>
-                                                                        </div>
-                                                                    )}
-                                                                    {block.response && (
-                                                                        <div className="tool-response">
-                                                                            <span className="tool-response-label">Result:</span>
-                                                                            <span className={`tool-response-status ${block.success ? 'success' : 'error'}`}>
-                                                                                {block.response}
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
-                                                                    {/* Show actual query result data */}
-                                                                    {block.data && Array.isArray(block.data) && block.data.length > 0 && (
-                                                                        <div className="tool-result-data">
-                                                                            <span className="tool-result-label">Data:</span>
-                                                                            <pre className="tool-result-content">
-                                                                                {JSON.stringify(block.data, null, 2)}
-                                                                            </pre>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )
-                                                }
-                                                return null
-                                            })}
-                                        </div>
-                                    )}
-
-                                {/* Show message text */}
-                                <div className="message-text">
-                                    {message.content ? renderFullMarkdown(message.content) : (
-                                        message.isStreaming && streamingBlocks.length === 0 ? (
-                                            <div className="typing-indicator">
-                                                <span></span>
-                                                <span></span>
-                                                <span></span>
-                                            </div>
-                                        ) : null
-                                    )}
-                                    {message.isStreaming && message.content && <span className="streaming-cursor">▊</span>}
-                                </div>
-
-                                {message.sql && !message.isStreaming && (
-                                    <div className="message-sql">
-                                        <div className="sql-header">
-                                            <span>Generated SQL</span>
-                                            <div className="sql-actions">
-                                                <button
-                                                    className="sql-btn"
-                                                    onClick={() => handleCopySQL(message.sql!, message.id)}
-                                                    title="Copy SQL"
-                                                >
-                                                    {copiedId === message.id ? (
-                                                        <Check size={14} />
-                                                    ) : (
-                                                        <Copy size={14} />
-                                                    )}
-                                                </button>
-                                                {onRunQuery && (
-                                                    <button
-                                                        className="sql-btn run"
-                                                        onClick={() => onRunQuery(message.sql!)}
-                                                        title="Run Query"
-                                                    >
-                                                        <Play size={12} />
-                                                        Run
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <pre className="sql-code">
-                                            <code>{highlightSQL(message.sql)}</code>
-                                        </pre>
-                                    </div>
-                                )}
-
-                                {/* Message Actions */}
-                                <div className="message-actions">
-                                    {message.role === 'user' ? (
-                                        <>
-                                            <button
-                                                className="action-btn"
-                                                onClick={() => handleEdit(message.id, message.content)}
-                                                title="Edit"
-                                            >
-                                                <Edit2 size={14} />
-                                            </button>
-                                            <button
-                                                className="action-btn"
-                                                onClick={() => handleRetry(message.content)}
-                                                title="Retry"
-                                            >
-                                                <RotateCcw size={14} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                className="action-btn"
-                                                onClick={() => handleCopyMessage(message.content, message.id)}
-                                                title="Copy"
-                                            >
-                                                {copiedId === message.id ? (
-                                                    <Check size={14} />
-                                                ) : (
-                                                    <Copy size={14} />
-                                                )}
-                                            </button>
-                                            <button
-                                                className={`action-btn ${feedbackGiven[message.id] === 'up' ? 'active' : ''}`}
-                                                onClick={() => handleFeedback(message.id, 'up')}
-                                                title="Good response"
-                                            >
-                                                <ThumbsUp size={14} />
-                                            </button>
-                                            <button
-                                                className={`action-btn ${feedbackGiven[message.id] === 'down' ? 'active' : ''}`}
-                                                onClick={() => handleFeedback(message.id, 'down')}
-                                                title="Bad response"
-                                            >
-                                                <ThumbsDown size={14} />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-
-                                <span className="message-time">{formatTime(message.timestamp)}</span>
-                            </div>
-                        </div>
-                    ))
-                )}
-
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input - Copilot Style with Inline Send Button */}
-            <div className="ai-input-section">
-                <div className="input-wrapper">
-                    <textarea
-                        ref={inputRef}
-                        className="ai-input"
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={requiresCredentials && !hasCredentials
-                            ? 'Configure credentials to start chatting...'
-                            : 'Ask your queries...'}
-                        disabled={isLoading || (requiresCredentials && !hasCredentials)}
-                        rows={1}
-                    />
-                    <button
-                        className="ai-send-btn"
-                        onClick={handleSubmit}
-                        disabled={!input.trim() || isLoading || (requiresCredentials && !hasCredentials)}
-                        title="Send message"
-                    >
-                        {isLoading ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-                    </button>
-                </div>
-                <div className="ai-bottom-selectors">
-                    <div className="ai-worksheet-selector">
-                        <select
-                            value={activeWorksheetId || ''}
-                            onChange={(e) => onSelectWorksheet?.(e.target.value)}
-                            disabled={worksheets.length === 0}
-                        >
-                            {worksheets.length === 0 ? (
-                                <option value="">No worksheets</option>
-                            ) : (
-                                worksheets.map(ws => (
-                                    <option key={ws.id} value={ws.id}>
-                                        {ws.title}
-                                    </option>
-                                ))
-                            )}
-                        </select>
-                    </div>
-                    <div className="ai-model-selector-bottom">
-                        <select
-                            value={selectedModelId}
-                            onChange={(e) => setSelectedModelId(parseInt(e.target.value, 10))}
+                            style={{
+                                padding: '8px 10px',
+                                fontSize: '13px',
+                                background: '#1a1a1a',
+                                color: '#d4d4d4',
+                                border: '1px solid #3a3a3a',
+                                borderRadius: '6px',
+                            }}
                         >
                             {providerModels.map(m => (
                                 <option key={m.modelId} value={m.modelId}>
@@ -1011,6 +492,308 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                             ))}
                         </select>
                     </div>
+
+                    {/* OpenAI Credentials */}
+                    {selectedProvider === 'openai' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>OpenAI API Key</label>
+                            <input
+                                type="password"
+                                value={credentials.OPENAI_API_KEY}
+                                onChange={(e) => setCredentials(prev => ({ ...prev, OPENAI_API_KEY: e.target.value }))}
+                                placeholder="sk-..."
+                                style={{
+                                    padding: '8px 10px',
+                                    fontSize: '13px',
+                                    background: '#1a1a1a',
+                                    color: '#d4d4d4',
+                                    border: '1px solid #3a3a3a',
+                                    borderRadius: '6px',
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Anthropic Credentials */}
+                    {selectedProvider === 'claude' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>Anthropic API Key</label>
+                            <input
+                                type="password"
+                                value={credentials.ANTHROPIC_API_KEY}
+                                onChange={(e) => setCredentials(prev => ({ ...prev, ANTHROPIC_API_KEY: e.target.value }))}
+                                placeholder="sk-ant-..."
+                                style={{
+                                    padding: '8px 10px',
+                                    fontSize: '13px',
+                                    background: '#1a1a1a',
+                                    color: '#d4d4d4',
+                                    border: '1px solid #3a3a3a',
+                                    borderRadius: '6px',
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* AWS Bedrock Credentials */}
+                    {selectedProvider === 'bedrock' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>AWS Access Key ID</label>
+                                <input
+                                    type="text"
+                                    value={credentials.AWS_ACCESS_KEY_ID}
+                                    onChange={(e) => setCredentials(prev => ({ ...prev, AWS_ACCESS_KEY_ID: e.target.value }))}
+                                    placeholder="AKIA..."
+                                    style={{
+                                        padding: '8px 10px',
+                                        fontSize: '13px',
+                                        background: '#1a1a1a',
+                                        color: '#d4d4d4',
+                                        border: '1px solid #3a3a3a',
+                                        borderRadius: '6px',
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>AWS Secret Access Key</label>
+                                <input
+                                    type="password"
+                                    value={credentials.AWS_SECRET_ACCESS_KEY}
+                                    onChange={(e) => setCredentials(prev => ({ ...prev, AWS_SECRET_ACCESS_KEY: e.target.value }))}
+                                    placeholder="••••••••"
+                                    style={{
+                                        padding: '8px 10px',
+                                        fontSize: '13px',
+                                        background: '#1a1a1a',
+                                        color: '#d4d4d4',
+                                        border: '1px solid #3a3a3a',
+                                        borderRadius: '6px',
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>AWS Region</label>
+                                <input
+                                    type="text"
+                                    value={credentials.AWS_REGION}
+                                    onChange={(e) => setCredentials(prev => ({ ...prev, AWS_REGION: e.target.value }))}
+                                    placeholder="us-east-1"
+                                    style={{
+                                        padding: '8px 10px',
+                                        fontSize: '13px',
+                                        background: '#1a1a1a',
+                                        color: '#d4d4d4',
+                                        border: '1px solid #3a3a3a',
+                                        borderRadius: '6px',
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* DBX Agent Info */}
+                    {selectedProvider === 'dbx-agent' && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 12px',
+                            background: '#1a1a1a',
+                            border: '1px solid #3a3a3a',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            color: '#9fb0c8',
+                        }}>
+                            <AlertCircle size={14} />
+                            <span>DBX Agent uses server-side processing. No API keys required!</span>
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                        <button
+                            onClick={handleSaveSettings}
+                            style={{
+                                padding: '8px 16px',
+                                fontSize: '13px',
+                                background: '#4a9eff',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 500,
+                            }}
+                        >
+                            Save Settings
+                        </button>
+                        <button
+                            onClick={() => setShowSettings(false)}
+                            style={{
+                                padding: '8px 16px',
+                                fontSize: '13px',
+                                background: 'transparent',
+                                color: '#9fb0c8',
+                                border: '1px solid #3a3a3a',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 500,
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Messages Area */}
+            <div style={{
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '16px',
+                gap: '12px',
+                overflowY: 'auto',
+                backgroundColor: '#1a1a1a',
+                color: '#e6eef8',
+            }}>
+                {messages.length === 0 ? (
+                    <div style={{
+                        margin: '0 auto',
+                        padding: '24px 16px',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px',
+                        color: '#e6eef8',
+                        background: '#1a1a1a',
+                        borderRadius: '8px',
+                    }}>
+                        <span style={{ fontSize: '48px', opacity: 1, marginBottom: '12px' }}>✨</span>
+                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff', margin: 0 }}>
+                            AI SQL Assistant
+                        </div>
+                        <p style={{ fontSize: '14px', lineHeight: '1.5', color: '#d4d4d4', opacity: 1, margin: 0 }}>
+                            Describe what data you need and I'll generate SQL queries for you.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px', maxWidth: '90%', marginLeft: 'auto', marginRight: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4' }}>
+                                <span style={{ fontSize: '14px' }}>🔍</span>
+                                <span>Natural language to SQL</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4' }}>
+                                <span style={{ fontSize: '14px' }}>📊</span>
+                                <span>Schema-aware queries</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4' }}>
+                                <span style={{ fontSize: '14px' }}>⚡</span>
+                                <span>Query optimization</span>
+                            </div>
+                        </div>
+                        <div style={{ marginTop: '24px', textAlign: 'left', maxWidth: '90%', marginLeft: 'auto', marginRight: 'auto' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 1, margin: 0 }}>Try asking:</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <button onClick={() => setInput('Show me all users who signed up last month')} style={{ padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                    Show me all users who signed up last month
+                                </button>
+                                <button onClick={() => setInput('What are the top 10 products by revenue?')} style={{ padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                    What are the top 10 products by revenue?
+                                </button>
+                                <button onClick={() => setInput('Count orders grouped by status')} style={{ padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease' }}>
+                                    Count orders grouped by status
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    messages.map(msg => (
+                        <div key={msg.id} style={{
+                            display: 'flex',
+                            width: '100%',
+                            marginBottom: '12px',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                        }}>
+                            <div style={{
+                                maxWidth: '90%',
+                                width: '100%',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                fontSize: '14px',
+                                lineHeight: '1.6',
+                                wordWrap: 'break-word',
+                                background: msg.role === 'user' ? '#2a2a2a' : 'transparent',
+                                color: msg.role === 'user' ? '#cccccc' : '#e6eef8',
+                                border: msg.role === 'user' ? '1px solid #3a3a3a' : 'none',
+                            }}>
+                                {renderMessageContent(msg)}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Input Section */}
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                padding: '12px',
+                borderTop: '1px solid #3a3a3a',
+                background: '#1a1a1a',
+                flexShrink: 0,
+            }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
+                    <textarea
+                        ref={inputRef}
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Ask me anything about your data..."
+                        disabled={isLoading}
+                        rows={1}
+                        style={{
+                            flex: 1,
+                            resize: 'none',
+                            fontSize: '13px',
+                            padding: '10px 44px 10px 14px',
+                            border: '1px solid #3a3a3a',
+                            borderRadius: '10px',
+                            lineHeight: '1.4',
+                            fontFamily: 'inherit',
+                            minHeight: '44px',
+                            maxHeight: '120px',
+                            overflowY: 'auto',
+                            outline: 'none',
+                            background: '#2a2a2a',
+                            color: '#d4d4d4',
+                            transition: '0.15s border-color, 0.15s box-shadow',
+                        }}
+                    />
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!input.trim() || isLoading}
+                        style={{
+                            position: 'absolute',
+                            right: '8px',
+                            bottom: '8px',
+                            width: '32px',
+                            height: '32px',
+                            border: 'none',
+                            background: '#4a9eff',
+                            color: '#fff',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
+                            opacity: isLoading || !input.trim() ? 0.6 : 1,
+                        }}
+                        title="Send message"
+                    >
+                        <Send size={16} />
+                    </button>
                 </div>
             </div>
         </div>

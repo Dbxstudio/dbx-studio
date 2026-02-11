@@ -20,6 +20,7 @@
         "@electric-sql/pglite": "^0.2.14",
         "@hono/zod-validator": "^0.4.0",
         "@orpc/server": "^1.13.0",
+        "@smithy/node-http-handler": "^4.4.9",
         "arktype": "^2.1.29",
         "consola": "^3.4.2",
         "drizzle-orm": "^0.45.1",
@@ -38,10 +39,10 @@
     },
     "devDependencies": {
         "@types/bun": "latest",
-        "bun-types": "latest",
-        "@types/pg": "^8.16.0",
         "@types/mssql": "^9.1.8",
-        "typescript": "^5.7.0",
-        "drizzle-kit": "^0.31.8"
+        "@types/pg": "^8.16.0",
+        "bun-types": "latest",
+        "drizzle-kit": "^0.31.8",
+        "typescript": "^5.7.0"
     }
 }

@@ -40,12 +40,12 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    background: var(--bg);
+    background: #171717;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
     font-size: 14px;
     line-height: 1.6;
-    color: var(--text);
-    border: 1px solid var(--panel-border);
+    color: #e6eef8;
+    border: 1px solid #333;
 }
 
 /* Header */
@@ -54,8 +54,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px 14px;
-    background: var(--control-bg);
-    border-bottom: 1px solid var(--panel-border);
+    background: #1f1f1f;
+    border-bottom: 1px solid #3a3a3a;
     flex-shrink: 0;
     gap: 12px;
 }
@@ -319,61 +319,70 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 12px 14px 90px;
+    padding: 12px 8px 100px 8px;
     gap: 12px;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Welcome Screen */
 .ai-welcome {
-    margin-top: 40px;
+    margin-top: 20px;
     text-align: center;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    color: var(--muted);
+    gap: 12px;
+    color: var(--text);
 }
 
 .welcome-icon {
-    font-size: 40px;
-    opacity: 0.65;
-    margin-bottom: 8px;
+    font-size: 48px;
+    opacity: 1;
+    margin-bottom: 12px;
 }
 
 .welcome-title {
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 600;
-    color: var(--text);
+    color: #ffffff;
+    margin: 0;
 }
 
 .welcome-description {
     font-size: 14px;
     line-height: 1.5;
-    opacity: 0.8;
+    color: #d4d4d4;
+    opacity: 1;
+    margin: 0;
 }
 
 .ai-features {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     margin-top: 16px;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .feature-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
-    background: var(--control-bg);
-    border: 1px solid var(--control-border);
+    padding: 12px 14px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
     border-radius: 8px;
     font-size: 13px;
     transition: all 0.2s ease;
-    color: var(--text);
+    color: #d4d4d4;
 }
 
 .feature-item:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
 }
 
 .feature-icon {
@@ -383,17 +392,21 @@
 
 /* Example Queries */
 .ai-examples {
-    margin-top: 20px;
+    margin-top: 24px;
     text-align: left;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .examples-title {
     font-size: 12px;
     font-weight: 600;
-    color: var(--muted);
+    color: #9fb0c8;
     margin-bottom: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    opacity: 1;
 }
 
 .example-queries {
@@ -403,11 +416,11 @@
 }
 
 .example-query {
-    padding: 10px 14px;
-    background: rgba(11, 95, 255, 0.08);
-    border: 1px solid rgba(11, 95, 255, 0.15);
+    padding: 12px 14px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
     border-radius: 8px;
-    color: var(--accent);
+    color: #d4d4d4;
     font-size: 13px;
     text-align: left;
     cursor: pointer;
@@ -415,7 +428,8 @@
 }
 
 .example-query:hover {
-    background: rgba(11, 95, 255, 0.12);
+    background: var(--accent);
+    color: white;
     transform: translateX(4px);
 }
 
@@ -912,8 +926,8 @@
     flex-direction: column;
     gap: 8px;
     padding: 12px;
-    border-top: 1px solid var(--panel-border);
-    background: var(--bg);
+    border-top: 1px solid #3a3a3a;
+    background: #171717;
     flex-shrink: 0;
 }
 
@@ -998,7 +1012,7 @@
     resize: none;
     font-size: 13px;
     padding: 10px 44px 10px 14px;
-    border: 1px solid var(--control-border);
+    border: 1px solid #3a3a3a;
     border-radius: 10px;
     line-height: 1.4;
     font-family: inherit;
@@ -1006,18 +1020,18 @@
     max-height: 120px;
     overflow-y: auto;
     outline: none;
-    background: var(--bg);
-    color: var(--text);
+    background: #2a2a2a;
+    color: #d4d4d4;
     transition: 0.15s border-color, 0.15s box-shadow;
 }
 
 .ai-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(11, 95, 255, 0.1);
+    border-color: #4a9eff;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
 }
 
 .ai-input::placeholder {
-    color: var(--muted);
+    color: #9fb0c8;
 }
 
 .ai-input:disabled {

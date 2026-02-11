@@ -58,6 +58,7 @@ export interface ToolCallEvent {
 /**
  * Get auth token from authTokenManager
  * Uses getValidToken which automatically refreshes if expired
+ * Returns a guest token if no valid token is found
  */
 async function getAuthTokenAsync(): Promise<string | null> {
     try {
@@ -65,9 +66,15 @@ async function getAuthTokenAsync(): Promise<string | null> {
         if (result.success && result.token) {
             return result.token
         }
-        return null
+        // Return a guest token if no valid auth token is found
+        const guestToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+        console.log('⚠️ [AI Service] No valid token found, using guest token')
+        return guestToken
     } catch {
-        return null
+        // Return a guest token on error
+        const guestToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+        console.log('⚠️ [AI Service] Token retrieval failed, using guest token')
+        return guestToken
     }
 }
 
@@ -563,15 +570,11 @@ class AIService {
             }
         },
         onToolCall?: (toolName: string, args: Record<string, unknown>, toolUseId?: string) => void,
-        onToolResponse?: (toolName: string, success: boolean, response: string, data?: unknown[], toolUseId?: string) => void
+        onToolResponse?: (toolName: string, success: boolean, response: string, data?: unknown[], toolUseId?: string, sql?: string) => void
     ): Promise<void> {
         try {
             // Get auth token
             const token = await getAuthTokenAsync()
-            if (!token) {
-                onError('Authentication required')
-                return
-            }
 
             // Build enhanced prompt if we have table details
             let enhancedMessage = message
@@ -721,7 +724,8 @@ class AIService {
                                         data.success ?? true,
                                         data.response || '',
                                         data.data,
-                                        data.toolUseId
+                                        data.toolUseId,
+                                        data.sql
                                     )
                                 }
                             } else if (data.type === 'done') {

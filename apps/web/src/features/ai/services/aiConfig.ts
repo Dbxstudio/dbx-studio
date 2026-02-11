@@ -24,8 +24,15 @@ export interface Model {
     isThinking?: boolean
 }
 
-// Only supported providers (NO DBX)
+// Supported providers
 export const PROVIDERS: Provider[] = [
+    {
+        id: 'dbx-agent',
+        name: 'DBX Agent',
+        description: 'Server-side AI agent (no API key required)',
+        serviceId: 801,
+        requiresCredentials: false, // Server-side, no client credentials needed
+    },
     {
         id: 'bedrock',
         name: 'AWS Bedrock',
@@ -51,6 +58,11 @@ export const PROVIDERS: Provider[] = [
 
 // Models for supported providers
 export const MODELS: Model[] = [
+    // DBX Agent models (server-side)
+    { modelId: 801, providerId: 'dbx-agent', label: 'Claude Sonnet 4.5 (DBX)', modelName: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' },
+    { modelId: 802, providerId: 'dbx-agent', label: 'Claude 3.5 Haiku (DBX)', modelName: 'us.anthropic.claude-3-5-haiku-20241022-v1:0' },
+    { modelId: 803, providerId: 'dbx-agent', label: 'Claude 3.7 Sonnet (DBX)', modelName: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0' },
+
     // AWS Bedrock models
     { modelId: 1, providerId: 'bedrock', label: 'Claude 3 Haiku', modelName: 'us.anthropic.claude-3-haiku-20240307-v1:0' },
     { modelId: 2, providerId: 'bedrock', label: 'Claude 3 Sonnet', modelName: 'us.anthropic.claude-3-sonnet-20240229-v1:0' },
@@ -92,7 +104,7 @@ export function getModelById(modelId: number): Model | undefined {
 }
 
 export function getDefaultProvider(): Provider {
-    return PROVIDERS[0] // bedrock (was dbx-agent)
+    return PROVIDERS[0] // dbx-agent (no API key required)
 }
 
 export function getDefaultModel(providerId: string): Model | undefined {

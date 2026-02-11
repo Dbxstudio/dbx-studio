@@ -40,6 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('⚠️ [AuthContext] Token may be expired, will try to refresh on next request')
             setToken(storedToken)
             setUser(storedUser)
+        } else {
+            // Auto-login with default guest user (no login required)
+            const defaultToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+            const defaultUser: UserInfo = {
+                user_id: 'guest_user',
+                firebase_user_id: 'guest_user',
+                email: 'guest@dbxstudio.local',
+                first_name: 'Guest',
+                last_name: 'User',
+                profile_pic_url: null
+            }
+            setCustomAuthToken(defaultToken, defaultUser, null)
+            setToken(defaultToken)
+            setUser(defaultUser)
+            console.log('✅ [AuthContext] Initialized as guest user (no login required)')
         }
 
         setIsLoading(false)

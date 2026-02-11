@@ -46,6 +46,7 @@ export interface ChatResponse {
 /**
  * Get auth token from authTokenManager
  * Uses getValidToken which automatically refreshes if expired
+ * Returns a guest token if no valid token is found
  */
 async function getAuthTokenAsync(): Promise<string | null> {
     try {
@@ -53,9 +54,15 @@ async function getAuthTokenAsync(): Promise<string | null> {
         if (result.success && result.token) {
             return result.token
         }
-        return null
+        // Return a guest token if no valid auth token is found
+        const guestToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+        console.log('⚠️ [AI Service] No valid token found, using guest token')
+        return guestToken
     } catch {
-        return null
+        // Return a guest token on error
+        const guestToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+        console.log('⚠️ [AI Service] Token retrieval failed, using guest token')
+        return guestToken
     }
 }
 
@@ -356,7 +363,9 @@ class AIService {
             let response: Response
 
             try {
+                console.log('🔄 Calling API with payload:', payload)
                 const result = await api.ai.query(payload as any)
+                console.log('✅ API response received:', result)
                 // Convert oRPC response to fetch Response format for consistency
                 response = new Response(JSON.stringify(result), {
                     status: 200,
@@ -364,6 +373,12 @@ class AIService {
                 })
             } catch (rpcError) {
                 // Handle oRPC errors
+                console.error('❌ RPC Error:', rpcError)
+                console.error('Error details:', {
+                    name: rpcError instanceof Error ? rpcError.name : 'Unknown',
+                    message: rpcError instanceof Error ? rpcError.message : String(rpcError),
+                    stack: rpcError instanceof Error ? rpcError.stack : undefined
+                })
                 const errorMessage = rpcError instanceof Error ? rpcError.message : 'RPC request failed'
                 response = new Response(JSON.stringify({
                     success: false,
@@ -658,7 +673,7 @@ class AIService {
         callbacks: {
             onChunk: (chunk: string) => void
             onToolCall: (toolName: string, args?: Record<string, unknown>) => void
-            onToolResponse: (toolName: string, success: boolean, response?: string, data?: unknown) => void
+            onToolResponse: (toolName: string, success: boolean, response?: string, data?: unknown, sql?: string) => void
             onComplete: (fullMessage: string, sql?: string) => void
             onError: (error: string) => void
         },
@@ -680,10 +695,6 @@ class AIService {
 
         try {
             const token = await getAuthTokenAsync()
-            if (!token) {
-                onError('Authentication required')
-                return
-            }
 
             let enhancedMessage = message
             if (context?.tableDetails) {
@@ -778,7 +789,7 @@ class AIService {
                                 onToolCall(data.toolName, data.args)
                             } else if (data.type === 'tool_response') {
                                 // Tool completed
-                                onToolResponse(data.toolName, data.success, data.response, data.data)
+                                onToolResponse(data.toolName, data.success, data.response, data.data, data.sql)
                             } else if (data.type === 'tools') {
                                 // Initial tools list - ignored
                             } else if (data.type === 'done') {

@@ -11,28 +11,46 @@ export * from './schema/queries'
 export * from './schema/settings'
 export * from './schema/ai-tables'
 
-// Create PGlite instance
-// In serverless environments (Vercel), use in-memory database
-// In local development, use file-based storage for persistence
-const pglite = new PGlite(
-    process.env.VERCEL ? 'memory://' : './data/dbx.db'
-)
+// Lazy PGlite instance - only created when needed
+let pgliteInstance: PGlite | null = null
+let dbInstance: ReturnType<typeof drizzle> | null = null
+let isInitialized = false
 
-// Create Drizzle instance with all schemas
-export const db = drizzle(pglite, {
-    schema: {
-        ...connections,
-        ...queries,
-        ...settings,
-        ...aiTables,
-    },
-    logger: process.env.NODE_ENV === 'development',
-})
+// Get or create PGlite instance
+async function getPGlite(): Promise<PGlite> {
+    if (!pgliteInstance) {
+        pgliteInstance = new PGlite('memory://')
+        // For memory mode, PGlite is ready immediately
+    }
+    return pgliteInstance
+}
+
+// Get or create Drizzle instance
+export async function getDb() {
+    if (!dbInstance) {
+        const pglite = await getPGlite()
+        dbInstance = drizzle(pglite, {
+            schema: {
+                ...connections,
+                ...queries,
+                ...settings,
+                ...aiTables,
+            },
+            logger: process.env.NODE_ENV === 'development',
+        })
+    }
+    return dbInstance
+}
+
+// Legacy export - will be initialized on first access
+// NOTE: This is a lazy promise, use await getDb() for proper initialization
+export let db: ReturnType<typeof drizzle>
+
 
 // Initialize database (create tables if they don't exist)
 export async function initializeDatabase() {
-    // Wait for PGlite to be ready
-    await pglite.waitReady
+    // Get PGlite instance
+    const pglite = await getPGlite()
 
     // Run initial SQL to create all tables
     await pglite.exec(`
@@ -202,7 +220,11 @@ export async function initializeDatabase() {
         ON CONFLICT (status) DO NOTHING;
     `)
 
+    // Initialize the db export for legacy code
+    db = await getDb()
+
     console.log('✅ Database initialized with AI tables')
 }
 
-export { pglite }
+// Export getPGlite for direct access if needed
+export { getPGlite }

@@ -48,6 +48,7 @@ export interface ChatResponse {
 /**
  * Get auth token from authTokenManager
  * Uses getValidToken which automatically refreshes if expired
+ * Returns a guest token if no valid token is found
  */
 async function getAuthTokenAsync(): Promise<string | null> {
     try {
@@ -55,9 +56,15 @@ async function getAuthTokenAsync(): Promise<string | null> {
         if (result.success && result.token) {
             return result.token
         }
-        return null
+        // Return a guest token if no valid auth token is found
+        const guestToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+        console.log('⚠️ [AI Service] No valid token found, using guest token')
+        return guestToken
     } catch {
-        return null
+        // Return a guest token on error
+        const guestToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
+        console.log('⚠️ [AI Service] Token retrieval failed, using guest token')
+        return guestToken
     }
 }
 
@@ -566,7 +573,7 @@ class AIService {
         callbacks: {
             onChunk: (chunk: string) => void
             onToolCall: (toolName: string, args?: Record<string, unknown>) => void
-            onToolResponse: (toolName: string, success: boolean, response?: string) => void
+            onToolResponse: (toolName: string, success: boolean, response?: string, data?: unknown, sql?: string) => void
             onComplete: (fullMessage: string, sql?: string) => void
             onError: (error: string) => void
         },
@@ -588,10 +595,6 @@ class AIService {
 
         try {
             const token = await getAuthTokenAsync()
-            if (!token) {
-                onError('Authentication required')
-                return
-            }
 
             let enhancedMessage = message
             if (context?.tableDetails) {
@@ -693,7 +696,7 @@ class AIService {
                             } else if (data.type === 'tool_response') {
                                 // Tool completed
                                 console.log('✅ Tool response:', data.toolName, data.success)
-                                onToolResponse(data.toolName, data.success, data.response)
+                                onToolResponse(data.toolName, data.success, data.response, data.data, data.sql)
                             } else if (data.type === 'tools') {
                                 // Initial tools list
                                 console.log('🛠️ Available tools:', data.tools)

@@ -4,17 +4,17 @@ import { useAuth } from '../../context/AuthContext'
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail } from '../../../../shared/utils/firebase'
 import { setCustomAuthToken } from '../../../../shared/utils/authTokenManager'
 import {
-  signUpWithEmail as cognitoSignUp,
-  confirmSignUpWithCode,
-  signInWithEmail as cognitoSignIn,
-  resendVerificationCode,
+    signUpWithEmail as cognitoSignUp,
+    confirmSignUpWithCode,
+    signInWithEmail as cognitoSignIn,
+    resendVerificationCode,
 } from '../../../../shared/utils/cognitoAuth'
 import { syncUserWithBackend } from '../../../../shared/utils/cognitoTokenManager'
 import { VerificationCode } from '../VerificationCode'
 import './Login.css'
 
 // Main Server API endpoint
-import { MAIN_SERVER_ENDPOINT } from '../../../../shared/constants/serverConfig'
+import { MAIN_SERVER_ENDPOINT, MAIN_SERVER_URL } from '../../../../shared/constants/serverConfig'
 
 type ViewType = 'options' | 'emailForm' | 'forgotPassword' | 'verification'
 type AuthMode = 'login' | 'signup'
@@ -313,7 +313,7 @@ export function Login({ onSuccess }: LoginProps) {
                         if (result.nextStep === 'CONFIRM_SIGN_UP') {
                             setCurrentView('verification')
                             setPendingVerificationEmail(email)
-                            setPendingVerificationUsername(result.username)
+                            setPendingVerificationUsername(result.username ?? null)
                             setPendingUserData(result.user)
                             setPendingPassword(password)
                             setIsAuthenticating(false)

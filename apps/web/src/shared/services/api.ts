@@ -4,7 +4,7 @@ import { RPCLink } from '@orpc/client/fetch'
 // API base URL
 // In production (Vercel), use the same domain. In development, use localhost
 const API_URL = import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002')
+    (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002')
 
 // Create the oRPC link with correct path format
 const link = new RPCLink({
@@ -78,6 +78,10 @@ export const api = createORPCClient<{
             schema?: string
             tables?: string[]
             database_name?: string
+            extra_context?: string
+            useTools?: boolean
+            use_thinking_mode?: boolean
+            force_model?: string
             AWS_ACCESS_KEY_ID?: string
             AWS_SECRET_ACCESS_KEY?: string
             AWS_REGION?: string

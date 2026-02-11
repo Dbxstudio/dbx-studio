@@ -18,7 +18,13 @@ import { createContext } from './orpc/context'
 import { router } from './orpc/routers'
 
 // Initialize unified PGLite database (includes AI tables)
-await initializeDatabase()
+try {
+    await initializeDatabase()
+    consola.success('Database initialized successfully')
+} catch (error) {
+    consola.error('Failed to initialize database:', error)
+    consola.warn('Server will continue without database - some features may not work')
+}
 
 // Create oRPC handler
 const rpcHandler = new RPCHandler(router, {

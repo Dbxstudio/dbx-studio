@@ -14,7 +14,7 @@ import { VerificationCode } from '../VerificationCode'
 import './Login.css'
 
 // Main Server API endpoint
-import { MAIN_SERVER_ENDPOINT } from '../../../../shared/constants/serverConfig'
+import { MAIN_SERVER_ENDPOINT, MAIN_SERVER_URL } from '../../../../shared/constants/serverConfig'
 
 type ViewType = 'options' | 'emailForm' | 'forgotPassword' | 'verification'
 type AuthMode = 'login' | 'signup'

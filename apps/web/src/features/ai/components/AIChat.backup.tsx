@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, X, Loader2, Copy, Check, Play, AlertCircle, RotateCcw, Edit2, ThumbsUp, ThumbsDown, Plus, MoreVertical, Database, ChevronDown, ChevronRight } from 'lucide-react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { Send, X, Loader2, Copy, Check, Play, AlertCircle, RotateCcw, Edit2, ThumbsUp, ThumbsDown, Plus, MoreVertical, Database, ChevronDown, ChevronRight, FileSearch, BarChart3 } from 'lucide-react'
 import aiService from '../services/aiService'
 import {
     PROVIDERS,
@@ -16,27 +16,16 @@ import { autoSaveMessages, getCurrentSessionId, createNewSession, loadSession } 
 import './ai-chat.css'
 import './hierarchical-selector.css'
 
-interface ToolCall {
-    toolName: string
-    rawToolName?: string
-    args?: Record<string, unknown>
-    sql?: string
-    response?: string
-    success?: boolean
-    data?: unknown[]  // Actual result data for display
-    timestamp?: number
-}
-
+// Streaming block types for tool display
 interface StreamingBlock {
-    type: 'thinking' | 'response' | 'tool' | 'sql' | 'error' | 'data'
+    type: 'thinking' | 'tool' | 'response' | 'sql' | 'error'
     content?: string
     toolName?: string
-    rawToolName?: string
-    sql?: string
     args?: Record<string, unknown>
     response?: string
     success?: boolean
-    data?: unknown[]  // For data results
+    sql?: string
+    data?: unknown // Tool result data (e.g., query results)
 }
 
 interface Message {
@@ -47,76 +36,11 @@ interface Message {
     timestamp: Date
     isError?: boolean
     isStreaming?: boolean
-    toolCalls?: ToolCall[]
-    streamingBlocks?: StreamingBlock[]
-}
-
-interface WorksheetInfo {
-    id: string
-    title: string
-}
-
-interface AIChatProps {
-    isOpen: boolean
-    onClose: () => void
-    onRunQuery?: (sql: string) => void
-    connectionId?: string
-    externalConnectionId?: string // Server-side connection ID for AI
-    schema?: string
-    tables?: string[]
-    tableDetails?: {
-        tableName: string
-        schema?: string
-        columns?: Array<{ name: string; type?: string; nullable?: boolean; isPrimaryKey?: boolean }>
-        sampleRows?: Array<Record<string, any>>
-    }
-    isDarkTheme?: boolean
-    worksheets?: WorksheetInfo[]
-    activeWorksheetId?: string
-    onSelectWorksheet?: (worksheetId: string) => void
-    connectionName?: string
+    streamingBlocks?: StreamingBlock[] // Save streaming blocks with message
 }
 
 /**
- * Format timestamp as HH:MM
- */
-function formatTime(date: Date): string {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-/**
- * Extract SQL from response text
- */
-function extractSQL(text: string): string | null {
-    if (!text) return null
-
-    // Try to extract from ```sql ... ``` blocks
-    const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i)
-    if (sqlBlockMatch && sqlBlockMatch[1]) {
-        return sqlBlockMatch[1].trim()
-    }
-
-    // Try to extract from ``` ... ``` blocks
-    const codeBlockMatch = text.match(/```\s*([\s\S]*?)\s*```/)
-    if (codeBlockMatch && codeBlockMatch[1]) {
-        const content = codeBlockMatch[1].trim()
-        // Check if it looks like SQL
-        if (/^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH)\s/i.test(content)) {
-            return content
-        }
-    }
-
-    // Try to find SQL statement in text
-    const sqlMatch = text.match(/(SELECT|INSERT|UPDATE|DELETE|CREATE|WITH)[\s\S]*?;/i)
-    if (sqlMatch) {
-        return sqlMatch[0].trim()
-    }
-
-    return null
-}
-
-/**
- * Get user-friendly display name for a tool
+ * Get user-friendly tool display name
  */
 function getToolDisplayName(toolName: string): string {
     const toolNameLower = (toolName || '').toLowerCase()
@@ -126,7 +50,7 @@ function getToolDisplayName(toolName: string): string {
     } else if (toolNameLower === 'execute_sql_query') {
         return 'Executing Query'
     } else if (toolNameLower === 'generate_bar_graph' || toolNameLower.includes('graph') || toolNameLower.includes('chart')) {
-        return 'Generating Graph'
+        return 'Generating Visualization'
     } else if (toolNameLower === 'get_enums') {
         return 'Getting Enums'
     } else if (toolNameLower === 'select_data') {
@@ -134,6 +58,51 @@ function getToolDisplayName(toolName: string): string {
     }
 
     return toolName
+}
+
+/**
+ * Get icon for tool type
+ */
+function getToolIcon(toolName: string) {
+    const toolNameLower = (toolName || '').toLowerCase()
+
+    if (toolNameLower === 'get_table_schema' || toolNameLower === 'inspect_database_schema') {
+        return <FileSearch size={14} />
+    } else if (toolNameLower === 'execute_sql_query') {
+        return <Database size={14} />
+    } else if (toolNameLower === 'generate_bar_graph' || toolNameLower.includes('graph') || toolNameLower.includes('chart')) {
+        return <BarChart3 size={14} />
+    }
+
+    return <Database size={14} />
+}
+
+// Lightweight Error Boundary to avoid blank screens on render errors
+class ChatErrorBoundary extends React.Component<any, { hasError: boolean }> {
+    constructor(props: any) {
+        super(props)
+        this.state = { hasError: false }
+    }
+
+    static getDerivedStateFromError() {
+        return { hasError: true }
+    }
+
+    componentDidCatch(error: any, info: any) {
+        console.error('AIChat render error:', error, info)
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="ai-error" style={{ padding: 16 }}>
+                    <strong>AI Chat failed to load.</strong>
+                    <div>Check the browser console for details.</div>
+                </div>
+            )
+        }
+        return this.props.children
+    }
 }
 
 export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConnectionId, schema, tables, tableDetails, isDarkTheme = true, worksheets = [], activeWorksheetId, onSelectWorksheet, connectionName }: AIChatProps) {
@@ -146,8 +115,12 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
     const [tokenCount, setTokenCount] = useState<number>(0)
 
-    // Track expanded tool blocks (collapsed by default)
+    // Streaming state for tool display
+    const [isStreaming, setIsStreaming] = useState(false)
+    const [streamingContent, setStreamingContent] = useState('')
+    const [streamingBlocks, setStreamingBlocks] = useState<StreamingBlock[]>([])
     const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
+    const streamingBlocksRef = useRef<StreamingBlock[]>([])
 
     // Schema/Table selection state
     const [selectedSchemaId, setSelectedSchemaId] = useState<string | number>('')
@@ -252,6 +225,11 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
             timestamp: new Date(),
         }
 
+        setMessages(prev => [...prev, userMessage])
+        setInput('')
+        setIsLoading(true)
+        setIsStreaming(true)
+
         // Create placeholder assistant message for streaming
         const assistantMessageId = (Date.now() + 1).toString()
         const assistantMessage: Message = {
@@ -260,18 +238,16 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
             content: '',
             timestamp: new Date(),
             isStreaming: true,
-            toolCalls: [],
-            streamingBlocks: [],
         }
 
-        setMessages(prev => [...prev, userMessage, assistantMessage])
-        setInput('')
-        setIsLoading(true)
+        // Add assistant message to show streaming immediately
+        setMessages(prev => [...prev, assistantMessage])
 
-        // Track streaming blocks locally - stores EVERYTHING in order (text + tools)
-        let currentBlocks: StreamingBlock[] = []
-        let currentToolCalls: ToolCall[] = []
-        let currentTextContent = '' // Track current text accumulation
+        // Reset streaming state for new message
+        setStreamingBlocks([])
+        setStreamingContent('')
+        streamingBlocksRef.current = []
+        setExpandedTools({}) // Reset expanded state for new conversation
 
         try {
             // Update AI service configuration
@@ -283,169 +259,153 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                 ...credentials
             })
 
-            let fullContent = ''
-            let charCount = 0
-
-            // Send message with streaming
-            await aiService.sendMessageStreaming(
+            // Use streaming endpoint with tool callbacks
+            await aiService.sendMessageStreamingWithTools(
                 userMessage.content,
-                // onChunk - update message as chunks arrive
-                (chunk: string) => {
-                    fullContent += chunk
-                    charCount += chunk.length
-                    currentTextContent += chunk
+                {
+                    onChunk: (chunk) => {
+                        setStreamingContent(prev => prev + chunk)
+                        // Update or add response block
+                        setStreamingBlocks(prev => {
+                            const lastBlock = prev[prev.length - 1]
+                            if (lastBlock?.type === 'response') {
+                                const newBlocks = [...prev]
+                                newBlocks[newBlocks.length - 1] = {
+                                    ...lastBlock,
+                                    content: (lastBlock.content || '') + chunk
+                                }
+                                streamingBlocksRef.current = newBlocks
+                                return newBlocks
+                            } else {
+                                const newBlocks = [...prev, { type: 'response' as const, content: chunk }]
+                                streamingBlocksRef.current = newBlocks
+                                return newBlocks
+                            }
+                        })
 
-                    // Find or create a 'response' block for accumulating text
-                    const lastBlock = currentBlocks[currentBlocks.length - 1]
-                    if (lastBlock && lastBlock.type === 'response') {
-                        // Update the last response block
-                        currentBlocks = currentBlocks.map((block, idx) =>
-                            idx === currentBlocks.length - 1
-                                ? { ...block, content: currentTextContent }
-                                : block
-                        )
-                    } else {
-                        // Create new response block
-                        currentBlocks = [...currentBlocks, { type: 'response', content: currentTextContent }]
+                        // Also update the assistant message content for fallback display
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === assistantMessageId
+                                ? { ...msg, content: msg.content + chunk }
+                                : msg
+                        ))
+                    },
+                    onToolCall: (toolName, args) => {
+                        setStreamingBlocks(prev => {
+                            const newBlock: StreamingBlock = {
+                                type: 'tool',
+                                toolName,
+                                args,
+                                content: `Calling ${getToolDisplayName(toolName)}...`,
+                                // Extract SQL from execute_sql_query tool
+                                sql: toolName === 'execute_sql_query' && args?.query ? String(args.query) : undefined
+                            }
+                            const newBlocks = [...prev, newBlock]
+                            streamingBlocksRef.current = newBlocks
+                            return newBlocks
+                        })
+                    },
+                    onToolResponse: (toolName, success, response, data, sql) => {
+                        setStreamingBlocks(prev => {
+                            const newBlocks = [...prev]
+                            // Find the last tool block with this name and update it
+                            for (let i = newBlocks.length - 1; i >= 0; i--) {
+                                if (newBlocks[i].type === 'tool' && newBlocks[i].toolName === toolName && !newBlocks[i].response) {
+                                    newBlocks[i] = {
+                                        ...newBlocks[i],
+                                        success,
+                                        response,
+                                        data, // Store the actual result data
+                                        sql: sql || undefined, // Store the generated SQL
+                                        content: success ? `${getToolDisplayName(toolName)} completed` : `${getToolDisplayName(toolName)} failed`
+                                    }
+                                    break
+                                }
+                            }
+                            streamingBlocksRef.current = newBlocks
+                            return newBlocks
+                        })
+                    },
+                    onComplete: (fullMessage, sql) => {
+                        setIsStreaming(false)
+                        setIsLoading(false)
+
+                        // Extract SQL from tool blocks if not provided in response
+                        let finalSQL = sql
+                        if (!finalSQL) {
+                            // Look for SQL in execute_sql_query tool blocks
+                            const sqlTool = streamingBlocksRef.current.find(
+                                b => b.type === 'tool' && b.toolName === 'execute_sql_query' && b.sql
+                            )
+                            if (sqlTool?.sql) {
+                                finalSQL = sqlTool.sql
+                            }
+                        }
+
+                        // Update the existing assistant message instead of creating a new one
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === assistantMessageId
+                                ? {
+                                    ...msg,
+                                    content: fullMessage,
+                                    sql: finalSQL,
+                                    isStreaming: false,
+                                    streamingBlocks: [...streamingBlocksRef.current] // Preserve tools for display
+                                }
+                                : msg
+                        ))
+
+                        // Don't clear streaming blocks immediately - they'll be preserved in the message
+                        // Only clear when starting a new message
+                    },
+                    onError: (error) => {
+                        setIsStreaming(false)
+                        setIsLoading(false)
+
+                        // Add error to streaming blocks
+                        setStreamingBlocks(prev => {
+                            const newBlocks = [...prev, { type: 'error' as const, content: error }]
+                            streamingBlocksRef.current = newBlocks
+                            return newBlocks
+                        })
+
+                        // Update the existing assistant message with error instead of creating new one
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === assistantMessageId
+                                ? {
+                                    ...msg,
+                                    content: error,
+                                    isError: true,
+                                    isStreaming: false,
+                                    streamingBlocks: [...streamingBlocksRef.current]
+                                }
+                                : msg
+                        ))
                     }
-
-                    // Update the streaming message
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? { ...msg, content: fullContent, isStreaming: true, streamingBlocks: [...currentBlocks], toolCalls: [...currentToolCalls] }
-                            : msg
-                    ))
-
-                    // Estimate token count (rough approximation: ~4 chars per token)
-                    setTokenCount(Math.ceil(charCount / 4))
                 },
-                // onComplete
-                (fullMessage: string, sql?: string, data?: { toolCalls?: Array<{ toolName: string; args?: Record<string, unknown>; sql?: string; response?: string; success?: boolean; data?: unknown[] }> }) => {
-                    // Final update with complete message
-                    const finalToolCalls = data?.toolCalls || currentToolCalls
-
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? {
-                                ...msg,
-                                content: fullMessage,
-                                sql: sql,
-                                isStreaming: false,
-                                toolCalls: finalToolCalls,
-                                streamingBlocks: currentBlocks, // Keep the blocks!
-                            }
-                            : msg
-                    ))
-
-                    // Final token count
-                    setTokenCount(Math.ceil(fullMessage.length / 4))
-                    setIsLoading(false)
-                },
-                // onError
-                (error: string) => {
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? {
-                                ...msg,
-                                content: error,
-                                isError: true,
-                                isStreaming: false,
-                            }
-                            : msg
-                    ))
-                    setIsLoading(false)
-                },
-                // context
                 {
                     connectionId,
                     externalConnectionId,
                     schema,
                     tables,
                     tableDetails,
-                },
-                // onToolCall - when a tool starts executing
-                (toolName: string, args: Record<string, unknown>, toolUseId?: string) => {
-                    // Reset text content since we're starting a tool call
-                    currentTextContent = ''
-
-                    const newBlock: StreamingBlock = {
-                        type: 'tool',
-                        toolName: getToolDisplayName(toolName),
-                        rawToolName: toolName,
-                        args,
-                        sql: args?.query as string | undefined,
-                    }
-                    currentBlocks = [...currentBlocks, newBlock]
-
-                    const newToolCall: ToolCall = {
-                        toolName: getToolDisplayName(toolName),
-                        rawToolName: toolName,
-                        args,
-                        sql: args?.query as string | undefined,
-                        timestamp: Date.now(),
-                    }
-                    currentToolCalls = [...currentToolCalls, newToolCall]
-
-                    // Update message with new tool block
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? { ...msg, streamingBlocks: [...currentBlocks], toolCalls: [...currentToolCalls] }
-                            : msg
-                    ))
-                },
-                // onToolResponse - when a tool completes
-                (toolName: string, success: boolean, response: string, data?: unknown[], toolUseId?: string, sql?: string) => {
-                    // Find the last tool block and update it with response
-                    let foundTool = false
-                    currentBlocks = currentBlocks.map((block, idx) => {
-                        // Find the last tool block that doesn't have a response yet
-                        if (!foundTool && block.type === 'tool' && block.success === undefined) {
-                            foundTool = true
-                            return { ...block, response, success, data, sql }
-                        }
-                        return block
-                    })
-
-                    // Update tool calls
-                    currentToolCalls = currentToolCalls.map((tc, idx) => {
-                        if (idx === currentToolCalls.length - 1) {
-                            return { ...tc, response, success, data }
-                        }
-                        return tc
-                    })
-
-                    // If we have data, add a data block for display
-                    if (data && data.length > 0) {
-                        const dataBlock: StreamingBlock = {
-                            type: 'data',
-                            data,
-                            response,
-                        }
-                        currentBlocks = [...currentBlocks, dataBlock]
-                    }
-
-                    // Update message with response
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? { ...msg, streamingBlocks: [...currentBlocks], toolCalls: [...currentToolCalls] }
-                            : msg
-                    ))
                 }
             )
         } catch (error) {
-            setMessages(prev => prev.map(msg =>
-                msg.id === assistantMessageId
-                    ? {
-                        ...msg,
-                        content: error instanceof Error ? error.message : 'Sorry, I encountered an error. Please try again.',
-                        isError: true,
-                        isStreaming: false,
-                    }
-                    : msg
-            ))
+            setIsStreaming(false)
             setIsLoading(false)
+            const errorMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: error instanceof Error ? error.message : 'Sorry, I encountered an error. Please try again.',
+                timestamp: new Date(),
+                isError: true,
+            }
+            setMessages(prev => [...prev, errorMessage])
+            setStreamingBlocks([])
+            setStreamingContent('')
         }
-    }, [input, isLoading, selectedProvider, selectedModelId, currentModel, connectionId, externalConnectionId, schema, tables, tableDetails, credentials, requiresCredentials, hasCredentials])
+    }, [input, isLoading, isStreaming, selectedProvider, selectedModelId, currentModel, connectionId, externalConnectionId, schema, tables, credentials, requiresCredentials, hasCredentials])
 
     const handleCopySQL = async (sql: string, messageId: string) => {
         await navigator.clipboard.writeText(sql)
@@ -521,14 +481,6 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
         setCurrentSessionId(newSessionId)
     }, [])
 
-    // Toggle tool block expansion
-    const toggleToolExpanded = useCallback((toolKey: string) => {
-        setExpandedTools(prev => ({
-            ...prev,
-            [toolKey]: !prev[toolKey]
-        }))
-    }, [])
-
     if (!isOpen) return null
 
     const themeClass = isDarkTheme ? 'dark-theme' : 'light-theme'
@@ -538,7 +490,6 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
             {/* Header */}
             <div className="ai-header">
                 <div className="ai-header-left">
-                    <img src="/assets/dbx-logo-white.png" alt="DBX Logo" className="ai-header-logo" />
                     <h3>Copilot Chat</h3>
                 </div>
                 <div className="ai-header-actions">
@@ -751,109 +702,137 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                                     </div>
                                 )}
 
-                                {/* During streaming: show blocks in order (tools then response) */}
-                                {/* After streaming: just show message.content (AI's final formatted response) */}
-                                {message.role === 'assistant' && message.isStreaming && message.streamingBlocks && message.streamingBlocks.length > 0 ? (
-                                    <div className="streaming-blocks">
-                                        {message.streamingBlocks.map((block, idx) => (
-                                            <div key={idx} className={`streaming-block ${block.type}`}>
-                                                {block.type === 'response' && block.content && (
-                                                    <div className="response-block">
-                                                        <div className="message-text">
-                                                            {renderFullMarkdown(block.content)}
-                                                            {idx === message.streamingBlocks!.length - 1 && (
-                                                                <span className="streaming-cursor">▊</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {block.type === 'tool' && (() => {
-                                                    const toolKey = `${message.id}-tool-${idx}`
-                                                    const isExpanded = expandedTools[toolKey] || false
+                                {/* Show streaming blocks FIRST for assistant messages (real-time tool display) */}
+                                {/* Also show preserved streamingBlocks for completed messages in the same position */}
+                                {message.role === 'assistant' && (
+                                    (message.isStreaming && streamingBlocks.length > 0) ||
+                                    (!message.isStreaming && message.streamingBlocks && message.streamingBlocks.length > 0)
+                                ) && (
+                                        <div className="streaming-blocks">
+                                            {(message.isStreaming ? streamingBlocks : message.streamingBlocks || []).map((block, idx) => {
+                                                if (block.type === 'tool') {
+                                                    const toolKey = message.isStreaming ? `streaming-tool-${idx}` : `message-${message.id}-tool-${idx}`
+                                                    const isExpanded = expandedTools[toolKey] === true // Default collapsed
+                                                    const isExecuteQuery = block.toolName === 'execute_sql_query'
+                                                    const executedSQL = isExecuteQuery && block.args?.query ? String(block.args.query) : block.sql
+
                                                     return (
-                                                        <div className={`tool-block ${isExpanded ? 'expanded' : 'collapsed'}`}>
+                                                        <div key={idx} className={`tool-block ${!message.isStreaming ? 'completed' : ''}`}>
                                                             <div
-                                                                className="tool-header clickable"
-                                                                onClick={() => toggleToolExpanded(toolKey)}
+                                                                className={`tool-header ${block.success === undefined ? 'pending' : block.success ? 'success' : 'error'}`}
+                                                                onClick={() => setExpandedTools(prev => ({ ...prev, [toolKey]: !isExpanded }))}
                                                             >
+                                                                <div className="tool-info">
+                                                                    {getToolIcon(block.toolName || '')}
+                                                                    <span className="tool-name">{getToolDisplayName(block.toolName || '')}</span>
+                                                                    {block.success === undefined && (
+                                                                        <Loader2 size={12} className="spin tool-spinner" />
+                                                                    )}
+                                                                    {block.success === true && (
+                                                                        <Check size={12} className="tool-success-icon" />
+                                                                    )}
+                                                                </div>
                                                                 <span className="tool-expand-icon">
-                                                                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                    {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                                                 </span>
-                                                                <span className="tool-icon">🔧</span>
-                                                                <span className="tool-name">{block.toolName || block.rawToolName}</span>
-                                                                {block.success === undefined && (
-                                                                    <Loader2 size={14} className="spin" />
-                                                                )}
-                                                                {block.success === true && (
-                                                                    <Check size={14} className="tool-success" />
-                                                                )}
-                                                                {block.success === false && (
-                                                                    <AlertCircle size={14} className="tool-error" />
-                                                                )}
                                                             </div>
                                                             {isExpanded && (
                                                                 <div className="tool-details">
-                                                                    {block.sql ? (
-                                                                        <div className="tool-sql">
-                                                                            <pre className="sql-code compact">
-                                                                                <code>{highlightSQL(block.sql)}</code>
+                                                                    {/* Show SQL prominently for execute_sql_query */}
+                                                                    {executedSQL && (
+                                                                        <div className="tool-sql-section">
+                                                                            <div className="tool-sql-label">SQL Query</div>
+                                                                            <pre className="tool-sql-content">
+                                                                                <code>{highlightSQL(executedSQL)}</code>
+                                                                            </pre>
+                                                                            {/* Show copy/run buttons for completed tools */}
+                                                                            {!message.isStreaming && (
+                                                                                <div className="tool-sql-actions">
+                                                                                    <button
+                                                                                        className="sql-btn"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation()
+                                                                                            handleCopySQL(executedSQL, `${message.id}-tool-${idx}`)
+                                                                                        }}
+                                                                                        title="Copy SQL"
+                                                                                    >
+                                                                                        {copiedId === `${message.id}-tool-${idx}` ? (
+                                                                                            <Check size={14} />
+                                                                                        ) : (
+                                                                                            <Copy size={14} />
+                                                                                        )}
+                                                                                    </button>
+                                                                                    {onRunQuery && (
+                                                                                        <button
+                                                                                            className="sql-btn run"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation()
+                                                                                                onRunQuery(executedSQL)
+                                                                                            }}
+                                                                                            title="Run Query"
+                                                                                        >
+                                                                                            <Play size={12} />
+                                                                                            Run
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Show other arguments for non-SQL tools */}
+                                                                    {block.args && !executedSQL && (
+                                                                        <div className="tool-args">
+                                                                            <span className="tool-args-label">Arguments:</span>
+                                                                            <pre className="tool-args-content">
+                                                                                {String(JSON.stringify(block.args, null, 2))}
                                                                             </pre>
                                                                         </div>
-                                                                    ) : (
-                                                                        <div className="tool-args">
-                                                                            <span className="tool-args-label">Tool details</span>
-                                                                            <div className="tool-args-content">No SQL generated for this tool.</div>
+                                                                    )}
+                                                                    {block.response && (
+                                                                        <div className="tool-response">
+                                                                            <span className="tool-response-label">Result:</span>
+                                                                            <span className={`tool-response-status ${block.success ? 'success' : 'error'}`}>
+                                                                                {block.response}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Show actual query result data */}
+                                                                    {block.data && Array.isArray(block.data) && block.data.length > 0 && (
+                                                                        <div className="tool-result-data">
+                                                                            <span className="tool-result-label">Data:</span>
+                                                                            <pre className="tool-result-content">
+                                                                                {JSON.stringify(block.data, null, 2)}
+                                                                            </pre>
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                             )}
                                                         </div>
                                                     )
-                                                })()}
-                                                {block.type === 'data' && block.data && block.data.length > 0 && (
-                                                    <div className="data-block">
-                                                        <div className="data-header">
-                                                            <span className="data-icon">📊</span>
-                                                            <span>Query Results ({block.data.length} row{block.data.length !== 1 ? 's' : ''})</span>
-                                                        </div>
-                                                        <div className="data-table-wrapper">
-                                                            <table className="data-table">
-                                                                <thead>
-                                                                    <tr>
-                                                                        {Object.keys(block.data[0] as Record<string, unknown>).map(key => (
-                                                                            <th key={key}>{key}</th>
-                                                                        ))}
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {(block.data as Record<string, unknown>[]).slice(0, 10).map((row, rowIdx) => (
-                                                                        <tr key={rowIdx}>
-                                                                            {Object.values(row).map((val, colIdx) => (
-                                                                                <td key={colIdx}>{String(val ?? '')}</td>
-                                                                            ))}
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                            {block.data.length > 10 && (
-                                                                <div className="data-more">... and {block.data.length - 10} more rows</div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="message-text">
-                                        {renderFullMarkdown(message.content)}
-                                    </div>
-                                )}
+                                                }
+                                                return null
+                                            })}
+                                        </div>
+                                    )}
 
-                                {message.sql && (
+                                {/* Show message text */}
+                                <div className="message-text">
+                                    {message.content ? renderFullMarkdown(message.content) : (
+                                        message.isStreaming && streamingBlocks.length === 0 ? (
+                                            <div className="typing-indicator">
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                            </div>
+                                        ) : null
+                                    )}
+                                    {message.isStreaming && message.content && <span className="streaming-cursor">▊</span>}
+                                </div>
+
+                                {message.sql && !message.isStreaming && (
                                     <div className="message-sql">
                                         <div className="sql-header">
-                                            <span>SQL</span>
+                                            <span>Generated SQL</span>
                                             <div className="sql-actions">
                                                 <button
                                                     className="sql-btn"
@@ -933,22 +912,11 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                                         </>
                                     )}
                                 </div>
+
                                 <span className="message-time">{formatTime(message.timestamp)}</span>
                             </div>
                         </div>
                     ))
-                )}
-
-                {isLoading && (
-                    <div className="message assistant">
-                        <div className="message-content">
-                            <div className="typing-indicator">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                        </div>
-                    </div>
                 )}
 
                 <div ref={messagesEndRef} />
@@ -956,13 +924,6 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
 
             {/* Input - Copilot Style with Inline Send Button */}
             <div className="ai-input-section">
-                <div className="ai-connection-info">
-                    <div className="ai-db-indicator">
-                        <Database size={14} />
-                        <span className="connection-status-dot"></span>
-                        {connectionName && <span className="connection-name">{connectionName}</span>}
-                    </div>
-                </div>
                 <div className="input-wrapper">
                     <textarea
                         ref={inputRef}

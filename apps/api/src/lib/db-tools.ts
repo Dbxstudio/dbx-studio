@@ -410,7 +410,8 @@ export async function generateSQLPrompt(
             : allTables.slice(0, 20) // Limit to first 20 tables if no filter
 
         for (const table of relevantTables) {
-            schemaText += `Table: ${table.name}\n`
+            const tableName = table.schema ? `${table.schema}.${table.name}` : table.name
+            schemaText += `Table: ${tableName}\n`
             schemaText += `Columns:\n`
             for (const col of table.columns) {
                 schemaText += `  - ${col.name} (${col.type})${col.nullable ? ' NULL' : ' NOT NULL'}\n`
@@ -436,7 +437,7 @@ ${schemaText}
 - Return ONLY the SQL query
 - Do not include markdown code blocks or explanations
 - Ensure the query is syntactically correct and executable
-- Use proper table and column names from the schema
+- ALWAYS use fully qualified table names (e.g. 'schema.table') to avoid ambiguity
 </response_format>
 
 <user_question>
@@ -729,6 +730,7 @@ export async function selectData(
 
         return {
             success: true,
+            sql: query.trim(),
             data: {
                 status: 'success',
                 count: maskedRows.length,
