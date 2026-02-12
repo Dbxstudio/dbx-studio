@@ -4,13 +4,14 @@ import { useAuth } from '../../context/AuthContext'
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail } from '../../../../shared/utils/firebase'
 import { setCustomAuthToken } from '../../../../shared/utils/authTokenManager'
 import {
-  signUpWithEmail as cognitoSignUp,
-  confirmSignUpWithCode,
-  signInWithEmail as cognitoSignIn,
-  resendVerificationCode,
+    signUpWithEmail as cognitoSignUp,
+    confirmSignUpWithCode,
+    signInWithEmail as cognitoSignIn,
+    resendVerificationCode,
 } from '../../../../shared/utils/cognitoAuth'
 import { syncUserWithBackend } from '../../../../shared/utils/cognitoTokenManager'
 import { VerificationCode } from '../VerificationCode'
+import { orpcClient } from '../../../../shared/services/orpc-client'
 import './Login.css'
 
 // Main Server API endpoint
@@ -52,12 +53,19 @@ export function Login({ onSuccess }: LoginProps) {
     const [authMode, setAuthMode] = useState<AuthMode>('login')
     const [currentView, setCurrentView] = useState<ViewType>('options')
     const [authLoadingMessage, setAuthLoadingMessage] = useState('Authenticating...')
-    const [useCognito, setUseCognito] = useState(true) // Use Cognito by default
+    // Force use of local auth (oRPC) instead of Cognito/Firebase
+    // Set to true if you have proper Cognito/Firebase credentials configured
+    const isWebMode = import.meta.env.VITE_APP_MODE === 'web'
+    const [useCognito, setUseCognito] = useState(false) // Always use local auth
 
     // Clear errors after timeout
     useEffect(() => {
         if (errorMessage) {
-            const timer = setTimeout(() => setErrorMessage(null), 10000)
+            console.log('⏰ [Login] Error message set, will clear in 30s:', errorMessage)
+            const timer = setTimeout(() => {
+                console.log('🧹 [Login] Auto-clearing error message')
+                setErrorMessage(null)
+            }, 30000)
             return () => clearTimeout(timer)
         }
     }, [errorMessage])
@@ -261,22 +269,80 @@ export function Login({ onSuccess }: LoginProps) {
         }
     }, [login, onSuccess])
 
+    // handleLocalAuth - Authenticate against local oRPC backend
+    const handleLocalAuth = async (isSignup: boolean) => {
+        try {
+            const cleanEmail = email.trim()
+            const cleanPassword = password.trim()
+            const cleanFirstName = firstName.trim()
+            const cleanLastName = lastName.trim()
+
+            const input = isSignup
+                ? { email: cleanEmail, password: cleanPassword, firstName: cleanFirstName, lastName: cleanLastName }
+                : { email: cleanEmail, password: cleanPassword }
+
+            console.log(`📡 [Login] ${isSignup ? 'Signup' : 'Login'} with orpcClient.auth`)
+
+            // Use orpcClient instead of direct fetch
+            const data = isSignup
+                ? await orpcClient.auth.signup(input)
+                : await orpcClient.auth.login(input)
+
+            console.log('✅ [Login] Auth Success:', { user: data.user })
+
+            const { token, user } = data
+
+            if (!token || !user) {
+                throw new Error('Invalid response from server')
+            }
+
+            // Success!
+            setAuthLoadingMessage('Success!')
+
+            // Store tokens properly similar to handleTokenReceived
+            const userInfo = {
+                user_id: user.user_id,
+                firebase_user_id: user.user_id,
+                email: user.email,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                profile_pic_url: undefined
+            }
+
+            setCustomAuthToken(token, userInfo, null)
+            login(token, userInfo)
+            setLoginSuccess(true)
+
+            setTimeout(() => {
+                // Force reload to ensure clean state
+                window.location.reload()
+            }, 1000)
+
+        } catch (error: any) {
+            console.error('❌ [Login] Local Auth Error Caught:', error)
+            const msg = error.message || 'Authentication failed'
+            console.log('⚠️ [Login] Setting error message to:', msg)
+            setErrorMessage(msg)
+        } finally {
+            console.log('🏁 [Login] handleLocalAuth finished')
+            setIsAuthenticating(false)
+        }
+    }
+
     // Handle login/signup with email
     const handleEmailPasswordAuth = useCallback(async (e: React.FormEvent) => {
         e.preventDefault()
+        console.log('🚀 [Login] Form submitted')
 
-        if (!termsAccepted) {
-            setErrorMessage('Please accept the Terms of Service and Privacy Policy to continue.')
-            return
-        }
-
+        // Basic validation
         if (!email || !email.includes('@')) {
+            console.log('⚠️ [Login] Invalid email')
             setErrorMessage('Please enter a valid email address.')
             return
         }
-
-        if (!password || password.length < 8) {
-            setErrorMessage('Password must be at least 8 characters.')
+        if (!password || password.length < 6) { // Changed minimum to 6 to match backend schema often
+            console.log('⚠️ [Login] Invalid password')
+            setErrorMessage('Password must be at least 6 characters.')
             return
         }
 
@@ -291,67 +357,40 @@ export function Login({ onSuccess }: LoginProps) {
             }
         }
 
+        if (!termsAccepted) {
+            setErrorMessage('Please accept the Terms of Service and Privacy Policy to continue.')
+            return
+        }
+
         setIsAuthenticating(true)
         setErrorMessage(null)
         setAuthLoadingMessage(authMode === 'login' ? 'Signing in...' : 'Creating account...')
+        console.log('🔄 [Login] Starting authentication...')
 
         try {
             if (useCognito) {
-                // Use Cognito for authentication
-                if (authMode === 'login') {
-                    await handleCognitoLogin()
-                } else {
-                    // Signup flow with Cognito
-                    const result = await cognitoSignUp(email, password, {
-                        firstName,
-                        lastName,
-                        genderId: genderId ? parseInt(genderId) : null,
-                        profilePicUrl: null,
-                    })
-
-                    if (result.success) {
-                        if (result.nextStep === 'CONFIRM_SIGN_UP') {
-                            setCurrentView('verification')
-                            setPendingVerificationEmail(email)
-                            setPendingVerificationUsername(result.username)
-                            setPendingUserData(result.user)
-                            setPendingPassword(password)
-                            setIsAuthenticating(false)
-                        }
-                    } else {
-                        throw new Error(result.error || 'Sign up failed')
-                    }
-                }
+                await handleCognitoLogin()
             } else {
-                // Use Firebase for authentication
-                let result
-                if (authMode === 'login') {
-                    result = await signInWithEmail(email, password)
-                } else {
-                    result = await signUpWithEmail(email, password)
-                }
-
-                if (!result.success) {
-                    throw new Error(result.error || 'Authentication failed')
-                }
-
-                // Handle token received from Firebase
-                await handleTokenReceived(
-                    result.token!,
-                    result.refreshToken || null,
-                    result.user!,
-                    authMode === 'signup'
-                )
+                // Use Local Auth instead of Firebase fallthrough
+                await handleLocalAuth(authMode === 'signup')
             }
-
-        } catch (error) {
+        } catch (error: any) {
+            console.error('❌ [Login] Top-level catch:', error)
             setIsAuthenticating(false)
-            setErrorMessage(error instanceof Error ? error.message : 'Authentication failed. Please try again.')
+            setErrorMessage(error.message || 'Authentication failed')
         }
-    }, [email, password, confirmPassword, firstName, lastName, genderId, authMode, termsAccepted, useCognito, handleTokenReceived, handleCognitoLogin])
+    }, [email, password, confirmPassword, firstName, lastName, authMode, useCognito, termsAccepted, handleCognitoLogin]) // Removed handleLocalAuth from deps as it uses closure state
+
 
     // Handle Google login
     const handleGoogleLogin = useCallback(async () => {
+        // Google Sign-In requires backend support which is not available in local mode
+        // unless fully configured with Firebase Admin SDK on backend which is not present in the simple local server.
+        if (!useCognito) {
+            setErrorMessage('Google Sign-In is not supported in local server mode. Please use "Sign in with Email" or "Create account".')
+            return
+        }
+
         if (!termsAccepted) {
             setErrorMessage('Please accept the Terms of Service and Privacy Policy to continue.')
             return
@@ -456,6 +495,21 @@ export function Login({ onSuccess }: LoginProps) {
                     {errorMessage}
                 </div>
             )}
+
+            {/* Create Account Link */}
+            <div className="mode-toggle" style={{ marginTop: '20px' }}>
+                <span className="mode-text">Don't have an account? </span>
+                <button
+                    type="button"
+                    className="mode-link"
+                    onClick={() => {
+                        setAuthMode('signup')
+                        showEmailForm()
+                    }}
+                >
+                    Create account
+                </button>
+            </div>
         </>
     )
 
@@ -481,6 +535,22 @@ export function Login({ onSuccess }: LoginProps) {
                 </button>
 
                 {/* Email/Password Form */}
+                {errorMessage && (
+                    <div style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        border: '1px solid rgba(239, 68, 68, 0.5)',
+                        color: '#fca5a5',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        marginBottom: '16px',
+                        textAlign: 'center',
+                        fontWeight: '500',
+                        display: 'block' // Force display
+                    }}>
+                        ❌ {errorMessage}
+                    </div>
+                )}
+
                 <form className="auth-form" onSubmit={handleEmailPasswordAuth}>
                     <div className="input-group">
                         <input
@@ -495,7 +565,8 @@ export function Login({ onSuccess }: LoginProps) {
                         <LuMail className="input-icon" />
                     </div>
 
-                    {!isLogin && useCognito && (
+
+                    {!isLogin && (
                         <>
                             <div className="input-group">
                                 <input
@@ -521,20 +592,22 @@ export function Login({ onSuccess }: LoginProps) {
                                 />
                             </div>
 
-                            <div className="input-group">
-                                <select
-                                    className="auth-input"
-                                    value={genderId}
-                                    onChange={(e) => setGenderId(e.target.value)}
-                                    disabled={isAuthenticating}
-                                >
-                                    <option value="">Gender (Optional)</option>
-                                    <option value="1">Male</option>
-                                    <option value="2">Female</option>
-                                    <option value="3">Other</option>
-                                    <option value="4">Prefer not to say</option>
-                                </select>
-                            </div>
+                            {useCognito && (
+                                <div className="input-group">
+                                    <select
+                                        className="auth-input"
+                                        value={genderId}
+                                        onChange={(e) => setGenderId(e.target.value)}
+                                        disabled={isAuthenticating}
+                                    >
+                                        <option value="">Gender (Optional)</option>
+                                        <option value="1">Male</option>
+                                        <option value="2">Female</option>
+                                        <option value="3">Other</option>
+                                        <option value="4">Prefer not to say</option>
+                                    </select>
+                                </div>
+                            )}
                         </>
                     )}
 

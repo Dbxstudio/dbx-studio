@@ -1,4 +1,4 @@
-export const MAIN_SERVER_URL = import.meta.env.VITE_MAIN_SERVER_URL || 'http://localhost:8000';
+export const MAIN_SERVER_URL = import.meta.env.VITE_MAIN_SERVER_URL || 'http://localhost:3002';
 export const MAIN_SERVER_ENDPOINT = `${MAIN_SERVER_URL}/api/v1`;
 
 export const AUTH_ENDPOINTS = {

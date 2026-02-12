@@ -17,6 +17,34 @@ function getAuthHeaders(): Record<string, string> {
 // Simple fetch-based client for now
 // TODO: Once oRPC client types are fixed, switch back to createORPCClient
 export const orpcClient = {
+    auth: {
+        login: async (input: any) => {
+            // Use REST endpoint at /api/auth/login (basePath /api + route /auth)
+            const res = await fetch(`${API_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(input)
+            })
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ message: 'Login failed' }))
+                throw new Error(error.detail || error.message || 'Login failed')
+            }
+            return res.json()
+        },
+        signup: async (input: any) => {
+            // Use REST endpoint at /api/auth/signup (basePath /api + route /auth)
+            const res = await fetch(`${API_URL}/api/auth/signup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(input)
+            })
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ message: 'Signup failed' }))
+                throw new Error(error.detail || error.message || 'Signup failed')
+            }
+            return res.json()
+        },
+    },
     chat: {
         createSession: async (input: any) => {
             const res = await fetch(`${API_URL}/chat.createSession`, {

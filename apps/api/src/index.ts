@@ -2,7 +2,6 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { prettyJSON } from 'hono/pretty-json'
-import { secureHeaders } from 'hono/secure-headers'
 import { timing } from 'hono/timing'
 import { onError } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
@@ -14,6 +13,7 @@ import { initializeDatabase } from './drizzle'
 // Import routes
 import { healthRoutes } from './routes/health'
 import { aiStreamRoutes } from './routes/ai-stream'
+import { authRoutes } from './routes/auth'
 import { createContext } from './orpc/context'
 import { router } from './orpc/routers'
 
@@ -49,7 +49,7 @@ const app = new Hono().basePath('/api')
 app.use('*', logger())
 app.use('*', timing())
 app.use('*', prettyJSON())
-app.use('*', secureHeaders())
+// Note: secureHeaders() middleware removed as it blocks Firebase popups with Cross-Origin-Opener-Policy
 app.use('*', cors({
     origin: (origin) => {
         // Same-origin requests (no origin header) - return '*' to allow
@@ -82,17 +82,22 @@ app.use('*', cors({
     },
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposeHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    maxAge: 86400, // 24 hours
 }))
 
 // Mount health routes
 app.route('/health', healthRoutes)
 
+// Mount REST auth routes (for Firebase/Google authentication)
+app.route('/auth', authRoutes)
+
 // Mount AI streaming routes
 app.route('/ai', aiStreamRoutes)
 
-// Mount oRPC handler
-app.use('/rpc/*', async (c, next) => {
+// Mount oRPC handler at /api/rpc/*
+app.use('/api/rpc/*', async (c, next) => {
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
         prefix: '/api/rpc',
         context: createContext(c),

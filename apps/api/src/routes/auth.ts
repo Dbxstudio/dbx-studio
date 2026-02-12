@@ -15,24 +15,81 @@ const app = new Hono()
 const users = new Map<string, { id: string; email: string; password: string; firstName: string; lastName: string }>()
 
 const loginSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
+    email: z.string().email().optional(),
+    password: z.string().min(6).optional(),
+    firebase_token: z.string().optional(),
+    firebase_user_id: z.string().optional(),
+    firebase_uid: z.string().optional(),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
 })
 
 const signupSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
+    email: z.string().email().optional(),
+    password: z.string().min(6).optional(),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
+    firebase_token: z.string().optional(),
+    firebase_user_id: z.string().optional(),
+    firebase_uid: z.string().optional(),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
 })
 
 /**
- * POST /auth/login - Login with email/password
+ * POST /auth/login - Login with email/password or Firebase token
  */
 app.post('/login', async (c) => {
     try {
         const body = await c.req.json()
         const input = loginSchema.parse(body)
+
+        // Check if this is Firebase authentication
+        if (input.firebase_token || input.firebase_user_id) {
+            // Firebase/Google Sign-In
+            const firebaseUserId = input.firebase_user_id || input.firebase_uid || nanoid(16)
+            const email = input.email || `user_${firebaseUserId}@firebase.local`
+
+            // Check if user exists, if not create one
+            let user = Array.from(users.values()).find(u => u.email === email)
+
+            if (!user) {
+                // Auto-create user for Firebase login
+                const userId = `usr_${nanoid(16)}`
+                user = {
+                    id: userId,
+                    email: email,
+                    password: nanoid(32), // Random password for Firebase users
+                    firstName: input.first_name || email.split('@')[0],
+                    lastName: input.last_name || '',
+                }
+                users.set(userId, user)
+                console.log(`✅ Auto-created user for Firebase login: ${email}`)
+            }
+
+            // Use the firebase_token as auth token or generate a new one
+            const token = input.firebase_token || `tok_${nanoid(32)}`
+
+            return c.json({
+                success: true,
+                token,
+                user: {
+                    user_id: user.id,
+                    firebase_user_id: firebaseUserId,
+                    email: user.email,
+                    first_name: user.firstName,
+                    last_name: user.lastName,
+                },
+            })
+        }
+
+        // Regular email/password authentication
+        if (!input.email || !input.password) {
+            return c.json(
+                { error: 'Email and password are required', detail: 'Email and password are required' },
+                400
+            )
+        }
 
         // Find user by email
         const user = Array.from(users.values()).find(u => u.email === input.email)
@@ -74,12 +131,72 @@ app.post('/login', async (c) => {
 })
 
 /**
- * POST /auth/signup - Sign up with email/password
+ * POST /auth/signup - Sign up with email/password or Firebase token
  */
 app.post('/signup', async (c) => {
     try {
         const body = await c.req.json()
         const input = signupSchema.parse(body)
+
+        // Check if this is Firebase authentication
+        if (input.firebase_token || input.firebase_user_id) {
+            // Firebase/Google Sign-In (auto-signup)
+            const firebaseUserId = input.firebase_user_id || input.firebase_uid || nanoid(16)
+            const email = input.email || `user_${firebaseUserId}@firebase.local`
+
+            // Check if user exists
+            let user = Array.from(users.values()).find(u => u.email === email)
+
+            if (user) {
+                // User already exists, return existing user (treated as login)
+                const token = input.firebase_token || `tok_${nanoid(32)}`
+                return c.json({
+                    success: true,
+                    token,
+                    user: {
+                        user_id: user.id,
+                        firebase_user_id: firebaseUserId,
+                        email: user.email,
+                        first_name: user.firstName,
+                        last_name: user.lastName,
+                    },
+                })
+            }
+
+            // Create new user for Firebase signup
+            const userId = `usr_${nanoid(16)}`
+            user = {
+                id: userId,
+                email: email,
+                password: nanoid(32), // Random password for Firebase users
+                firstName: input.first_name || input.firstName || email.split('@')[0],
+                lastName: input.last_name || input.lastName || '',
+            }
+            users.set(userId, user)
+            console.log(`✅ Created user via Firebase signup: ${email}`)
+
+            const token = input.firebase_token || `tok_${nanoid(32)}`
+
+            return c.json({
+                success: true,
+                token,
+                user: {
+                    user_id: userId,
+                    firebase_user_id: firebaseUserId,
+                    email: email,
+                    first_name: user.firstName,
+                    last_name: user.lastName,
+                },
+            })
+        }
+
+        // Regular email/password signup
+        if (!input.email || !input.password) {
+            return c.json(
+                { error: 'Email and password are required', detail: 'Email and password are required' },
+                400
+            )
+        }
 
         // Check if user already exists
         const existingUser = Array.from(users.values()).find(u => u.email === input.email)
@@ -97,8 +214,8 @@ app.post('/signup', async (c) => {
             id: userId,
             email: input.email,
             password: input.password,
-            firstName: input.firstName || '',
-            lastName: input.lastName || '',
+            firstName: input.firstName || input.first_name || '',
+            lastName: input.lastName || input.last_name || '',
         }
         users.set(userId, newUser)
 
