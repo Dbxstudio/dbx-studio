@@ -1,0 +1,14 @@
+node_modules
+.turbo
+apps/*/node_modules
+apps/*/dist
+apps/*/.turbo
+packages/*/node_modules
+packages/*/dist
+packages/*/.turbo
+.env
+.env.local
+.git
+.github
+playwright-report
+test-results

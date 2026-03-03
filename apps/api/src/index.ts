@@ -85,7 +85,7 @@ app.route('/health', healthRoutes)
 // Mount AI streaming routes
 app.route('/ai', aiStreamRoutes)
 
-// Mount oRPC handler
+// Mount oRPC handler at /api/rpc/*
 app.use('/rpc/*', async (c, next) => {
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
         prefix: '/api/rpc',

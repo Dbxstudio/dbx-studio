@@ -3,7 +3,8 @@
  * Type-safe client for API communication
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/orpc'
+const API_URL = import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002');
 
 function getAuthHeaders(): Record<string, string> {
     const token = localStorage.getItem('auth-token')
@@ -19,7 +20,7 @@ function getAuthHeaders(): Record<string, string> {
 export const orpcClient = {
     chat: {
         createSession: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.createSession`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.createSession`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
@@ -27,7 +28,7 @@ export const orpcClient = {
             return res.json()
         },
         getSession: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.getSession`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.getSession`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
@@ -35,7 +36,7 @@ export const orpcClient = {
             return res.json()
         },
         listSessions: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.listSessions`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.listSessions`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
@@ -43,7 +44,7 @@ export const orpcClient = {
             return res.json()
         },
         sendMessage: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.sendMessage`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.sendMessage`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
@@ -51,7 +52,7 @@ export const orpcClient = {
             return res.json()
         },
         getMessages: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.getMessages`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.getMessages`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
@@ -59,7 +60,7 @@ export const orpcClient = {
             return res.json()
         },
         deleteSession: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.deleteSession`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.deleteSession`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
@@ -67,7 +68,7 @@ export const orpcClient = {
             return res.json()
         },
         updateSession: async (input: any) => {
-            const res = await fetch(`${API_URL}/chat.updateSession`, {
+            const res = await fetch(`${API_URL}/api/rpc/chat.updateSession`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(input)
