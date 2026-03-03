@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, X, Sparkles, Settings, RefreshCw, AlertCircle, Play, Copy, Check } from 'lucide-react'
+import { Send, X, Sparkles, Settings, RefreshCw, AlertCircle, Play, Copy, Check, ThumbsUp, ThumbsDown } from 'lucide-react'
 import {
     PROVIDERS,
     MODELS,
@@ -8,6 +8,7 @@ import {
     providerRequiresCredentials,
 } from '../services/aiConfig'
 import aiService from '../services/aiService'
+import { api } from '../../../shared/services/api'
 import './ai-chat.css'
 
 interface AIChatProps {
@@ -49,6 +50,7 @@ export function AIChat({
     const [isLoading, setIsLoading] = useState(false)
     const [showSettings, setShowSettings] = useState(false)
     const [copiedId, setCopiedId] = useState<string | null>(null)
+    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down' | undefined>>({})
 
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -122,6 +124,32 @@ export function AIChat({
         setCopiedId(id)
         setTimeout(() => setCopiedId(null), 2000)
     }
+
+    const handleFeedback = useCallback(async (messageId: string, type: 'up' | 'down') => {
+        // Optimistic UI update
+        const newFeedbackType = feedbackGiven[messageId] === type ? undefined : type;
+        setFeedbackGiven(prev => ({
+            ...prev,
+            [messageId]: newFeedbackType
+        }))
+
+        if (newFeedbackType) {
+            try {
+                // Submit to backend via oRPC client
+                await api.ai.chat.submitFeedback({
+                    messageId,
+                    feedbackType: newFeedbackType
+                })
+            } catch (error) {
+                console.error('Failed to submit feedback:', error)
+                // Revert optimistic update on error
+                setFeedbackGiven(prev => ({
+                    ...prev,
+                    [messageId]: undefined
+                }))
+            }
+        }
+    }, [feedbackGiven])
 
     if (!isOpen) return null
 
@@ -728,6 +756,52 @@ export function AIChat({
                                 border: msg.role === 'user' ? '1px solid #3a3a3a' : 'none',
                             }}>
                                 {renderMessageContent(msg)}
+
+                                {msg.role === 'assistant' && !msg.content.startsWith('Error:') && (
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'flex-start',
+                                        gap: '6px',
+                                        marginTop: '10px',
+                                        paddingTop: '10px',
+                                        borderTop: '1px solid #3a3a3a',
+                                    }}>
+                                        <button
+                                            onClick={() => handleFeedback(msg.id, 'up')}
+                                            title="Good response"
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                padding: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: feedbackGiven[msg.id] === 'up' ? '#4ade80' : '#888',
+                                                transition: 'color 0.2s',
+                                            }}
+                                        >
+                                            <ThumbsUp size={14} fill={feedbackGiven[msg.id] === 'up' ? 'currentColor' : 'none'} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleFeedback(msg.id, 'down')}
+                                            title="Bad response"
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                padding: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: feedbackGiven[msg.id] === 'down' ? '#f87171' : '#888',
+                                                transition: 'color 0.2s',
+                                            }}
+                                        >
+                                            <ThumbsDown size={14} fill={feedbackGiven[msg.id] === 'down' ? 'currentColor' : 'none'} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))

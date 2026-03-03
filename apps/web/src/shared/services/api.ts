@@ -65,6 +65,9 @@ export const api = createORPCClient<{
             OPENAI_API_KEY?: string
         }) => Promise<any>
         clearCredentials: () => Promise<any>
+        chat: {
+            submitFeedback: (input: { sessionId?: string; messageId: string; feedbackType: 'up' | 'down' }) => Promise<any>
+        }
         query: (input: {
             query: string
             message?: string

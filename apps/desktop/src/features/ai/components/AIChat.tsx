@@ -13,6 +13,7 @@ import { HierarchicalSelector } from './HierarchicalSelector'
 import { renderFullMarkdown } from '../utils/fullMarkdownRenderer'
 import { highlightSQL } from '../utils/sqlHighlighter'
 import { autoSaveMessages, getCurrentSessionId, createNewSession, loadSession } from '../services/aiChatStorage'
+import { api } from '../../../shared/services/api'
 import './ai-chat.css'
 import './hierarchical-selector.css'
 
@@ -142,7 +143,7 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
     const [isLoading, setIsLoading] = useState(false)
     const [copiedId, setCopiedId] = useState<string | null>(null)
     const [showSettings, setShowSettings] = useState(false)
-    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({})
+    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down' | undefined>>({})
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
     const [tokenCount, setTokenCount] = useState<number>(0)
 
@@ -470,13 +471,33 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
         inputRef.current?.focus()
     }, [])
 
-    const handleFeedback = useCallback((messageId: string, type: 'up' | 'down') => {
+    const handleFeedback = useCallback(async (messageId: string, type: 'up' | 'down') => {
+        // Optimistic UI update
+        const newFeedbackType = feedbackGiven[messageId] === type ? undefined : type;
         setFeedbackGiven(prev => ({
             ...prev,
-            [messageId]: prev[messageId] === type ? undefined as any : type
+            [messageId]: newFeedbackType as 'up' | 'down' | undefined
         }))
-        // TODO: Send feedback to backend
-    }, [])
+
+        // Optional: only send if we are setting new feedback
+        if (newFeedbackType && currentSessionId) {
+            try {
+                // Submit to backend via oRPC client
+                await api.ai.chat.submitFeedback({
+                    sessionId: currentSessionId,
+                    messageId,
+                    feedbackType: newFeedbackType
+                })
+            } catch (error) {
+                console.error('Failed to submit feedback:', error)
+                // Revert optimistic update on error
+                setFeedbackGiven(prev => ({
+                    ...prev,
+                    [messageId]: undefined as any
+                }))
+            }
+        }
+    }, [feedbackGiven, currentSessionId])
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {

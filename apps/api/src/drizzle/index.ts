@@ -211,6 +211,14 @@ export async function initializeDatabase() {
             created_at TIMESTAMP DEFAULT NOW() NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS ai_feedback (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT REFERENCES ai_sessions(id) ON DELETE CASCADE,
+            message_id TEXT NOT NULL,
+            feedback_type TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL
+        );
+
         -- Insert default database types
         INSERT INTO db_types (name) VALUES ('postgresql'), ('mysql'), ('mssql'), ('clickhouse'), ('snowflake')
         ON CONFLICT (name) DO NOTHING;
