@@ -16,8 +16,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
   "devDependencies": {
-    "turbo": "^2.7.2",
-    "prettier": "^3.4.2"
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.2.3",
+    "prettier": "^3.4.2",
+    "turbo": "^2.7.2"
   },
   "packageManager": "pnpm@10.26.2",
   "engines": {

@@ -22,6 +22,7 @@
         }
     },
     "include": [
+        "src/**/*",
         "app/**/*",
         "app.config.ts"
     ],
