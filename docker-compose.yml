@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  dbx-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dbx-studio:latest
+    container_name: dbx-studio
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount volumes to persist local database data if PGlite/SQLite is used
+      - dbx-studio-data:/app/apps/api/data
+      - dbx-studio-root-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  dbx-studio-data:
+  dbx-studio-root-data:

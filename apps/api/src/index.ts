@@ -97,7 +97,7 @@ app.route('/auth', authRoutes)
 app.route('/ai', aiStreamRoutes)
 
 // Mount oRPC handler at /api/rpc/*
-app.use('/api/rpc/*', async (c, next) => {
+app.use('/rpc/*', async (c, next) => {
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
         prefix: '/api/rpc',
         context: createContext(c),

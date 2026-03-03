@@ -47,7 +47,40 @@ dbx-studio/
 - Bun >= 1.0
 - pnpm >= 8
 
-## Quick Start
+## Docker Setup (Recommended)
+
+The easiest way to get DBX Studio running locally is via Docker. This ensures all parts of the application run perfectly without you needing to install Node, Bun, or deal with any environment configuration issues.
+
+1. Ensure you have [Docker](https://www.docker.com/) installed and running.
+
+### Option 1: Start DBX Studio (Pre-built Image)
+
+**Linux/MacOS (Bash/Zsh Shell):**
+
+```bash
+docker run -it --name dbx-studio -p 8080:8080 -v "./app_data:/app/data" -v "./api_data:/app/apps/api/data" ghcr.io/dbxstudio/dbx-studio:latest
+```
+
+**Windows (PowerShell):**
+
+```powershell
+docker run -it --name dbx-studio -p 8080:8080 -v "${PWD}\app_data:/app/data" -v "${PWD}\api_data:/app/apps/api/data" ghcr.io/dbxstudio/dbx-studio:latest
+```
+
+Then open your browser and go to `http://localhost:8080`
+
+### Option 2: Build Locally (Docker Compose)
+
+Run the following command in the root of the project:
+
+```bash
+docker-compose up -d --build
+```
+Open your browser and go to `http://localhost:8080`
+
+**Local State:** Your connections and config are safely stored in local volumes (`app_data` and `api_data`), so they persist even if you delete your container.
+
+## Manual Quick Start
 
 ### 1. Install Dependencies
 
