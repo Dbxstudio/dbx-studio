@@ -124,6 +124,15 @@ export const aiLongTermMemories = pgTable('ai_long_term_memories', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+// AI Feedback
+export const aiFeedback = pgTable('ai_feedback', {
+    id: serial('id').primaryKey(),
+    sessionId: text('session_id').references(() => aiSessions.id, { onDelete: 'cascade' }),
+    messageId: text('message_id').notNull(),
+    feedbackType: text('feedback_type').notNull(), // 'up' or 'down'
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 // ========== Zod Schemas ==========
 
 export const dbTypeInsertSchema = createInsertSchema(dbTypes)
@@ -156,6 +165,9 @@ export const aiConversationSelectSchema = createSelectSchema(aiConversations)
 export const aiLongTermMemoryInsertSchema = createInsertSchema(aiLongTermMemories)
 export const aiLongTermMemorySelectSchema = createSelectSchema(aiLongTermMemories)
 
+export const aiFeedbackInsertSchema = createInsertSchema(aiFeedback)
+export const aiFeedbackSelectSchema = createSelectSchema(aiFeedback)
+
 // ========== Type Exports ==========
 
 export type DbType = typeof dbTypes.$inferSelect
@@ -185,5 +197,8 @@ export type NewAISession = typeof aiSessions.$inferInsert
 export type AIConversation = typeof aiConversations.$inferSelect
 export type NewAIConversation = typeof aiConversations.$inferInsert
 
-export type AILongTermMemory = typeof aiLongTermMemories.$inferSelect
+export const AILongTermMemory = typeof aiLongTermMemories.$inferSelect
 export type NewAILongTermMemory = typeof aiLongTermMemories.$inferInsert
+
+export type AIFeedback = typeof aiFeedback.$inferSelect
+export type NewAIFeedback = typeof aiFeedback.$inferInsert

@@ -13,6 +13,7 @@ import { HierarchicalSelector } from './HierarchicalSelector'
 import { renderFullMarkdown } from '../utils/fullMarkdownRenderer'
 import { highlightSQL } from '../utils/sqlHighlighter'
 import { autoSaveMessages, getCurrentSessionId, createNewSession, loadSession } from '../services/aiChatStorage'
+import { api } from '../../../shared/services/api'
 import './ai-chat.css'
 import './hierarchical-selector.css'
 
@@ -142,7 +143,7 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
     const [isLoading, setIsLoading] = useState(false)
     const [copiedId, setCopiedId] = useState<string | null>(null)
     const [showSettings, setShowSettings] = useState(false)
-    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({})
+    const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down' | undefined>>({})
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
     const [tokenCount, setTokenCount] = useState<number>(0)
 
@@ -394,14 +395,14 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                     ))
                 },
                 // onToolResponse - when a tool completes
-                (toolName: string, success: boolean, response: string, data?: unknown[], toolUseId?: string) => {
+                (toolName: string, success: boolean, response: string, data?: unknown[], toolUseId?: string, sql?: string) => {
                     // Find the last tool block and update it with response
                     let foundTool = false
                     currentBlocks = currentBlocks.map((block, idx) => {
                         // Find the last tool block that doesn't have a response yet
                         if (!foundTool && block.type === 'tool' && block.success === undefined) {
                             foundTool = true
-                            return { ...block, response, success, data }
+                            return { ...block, response, success, data, sql }
                         }
                         return block
                     })
@@ -470,13 +471,33 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
         inputRef.current?.focus()
     }, [])
 
-    const handleFeedback = useCallback((messageId: string, type: 'up' | 'down') => {
+    const handleFeedback = useCallback(async (messageId: string, type: 'up' | 'down') => {
+        // Optimistic UI update
+        const newFeedbackType = feedbackGiven[messageId] === type ? undefined : type;
         setFeedbackGiven(prev => ({
             ...prev,
-            [messageId]: prev[messageId] === type ? undefined as any : type
+            [messageId]: newFeedbackType as 'up' | 'down' | undefined
         }))
-        // TODO: Send feedback to backend
-    }, [])
+
+        // Optional: only send if we are setting new feedback
+        if (newFeedbackType && currentSessionId) {
+            try {
+                // Submit to backend via oRPC client
+                await api.ai.chat.submitFeedback({
+                    sessionId: currentSessionId,
+                    messageId,
+                    feedbackType: newFeedbackType
+                })
+            } catch (error) {
+                console.error('Failed to submit feedback:', error)
+                // Revert optimistic update on error
+                setFeedbackGiven(prev => ({
+                    ...prev,
+                    [messageId]: undefined as any
+                }))
+            }
+        }
+    }, [feedbackGiven, currentSessionId])
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -793,16 +814,16 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                                                             </div>
                                                             {isExpanded && (
                                                                 <div className="tool-details">
-                                                                    {block.sql && (
+                                                                    {block.sql ? (
                                                                         <div className="tool-sql">
                                                                             <pre className="sql-code compact">
                                                                                 <code>{highlightSQL(block.sql)}</code>
                                                                             </pre>
                                                                         </div>
-                                                                    )}
-                                                                    {block.response && (
-                                                                        <div className="tool-response">
-                                                                            <span className="tool-response-text">{block.response}</span>
+                                                                    ) : (
+                                                                        <div className="tool-args">
+                                                                            <span className="tool-args-label">Tool details</span>
+                                                                            <div className="tool-args-content">No SQL generated for this tool.</div>
                                                                         </div>
                                                                     )}
                                                                 </div>

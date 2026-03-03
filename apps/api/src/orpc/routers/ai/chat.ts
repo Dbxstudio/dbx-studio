@@ -18,6 +18,7 @@ import {
     aiSessions,
     aiConversations,
     aiLongTermMemories,
+    aiFeedback,
     schemaTables,
     schemas,
     databases,
@@ -76,6 +77,12 @@ const updateSessionSchema = z.object({
     sessionId: z.string(),
     sessionName: z.string().optional(),
     metadata: z.record(z.any()).optional(),
+})
+
+const submitFeedbackSchema = z.object({
+    sessionId: z.string().optional(),
+    messageId: z.string(),
+    feedbackType: z.enum(['up', 'down']),
 })
 
 // Message Schemas
@@ -903,6 +910,36 @@ export const getMessage = orpc
         }
     })
 
+/**
+ * Submit feedback for a message
+ */
+export const submitFeedback = orpc
+    .input(submitFeedbackSchema)
+    .handler(async ({ input }) => {
+        const { sessionId, messageId, feedbackType } = input
+
+        try {
+            await db.insert(aiFeedback)
+                .values({
+                    sessionId,
+                    messageId,
+                    feedbackType,
+                })
+
+            consola.info(`👍 Received feedback (${feedbackType}) for message ${messageId} in session ${sessionId}`)
+
+            return {
+                success: true,
+                message: 'Feedback submitted successfully',
+            }
+        } catch (error) {
+            consola.error('Error submitting feedback:', error)
+            throw new ORPCError('INTERNAL_SERVER_ERROR', {
+                message: error instanceof Error ? error.message : 'Failed to submit feedback',
+            })
+        }
+    })
+
 // Export chat router
 export const chatRouter = {
     // Session management
@@ -915,4 +952,5 @@ export const chatRouter = {
     sendMessage,
     getMessages,
     getMessage,
+    submitFeedback,
 }
