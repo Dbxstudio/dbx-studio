@@ -100,6 +100,15 @@ dbx-studio/
 - Bun >= 1.0
 - pnpm >= 8
 
+## Docker Image (Windows)
+```bash
+docker run -d --name dbx-studio1 -p 3000:3000 -p 3002:3002 -v "${PWD}\app_data:/app/data" -v "${PWD}\api_data:/app/apps/api/data" dbx25/dbx-studio1:latest
+```
+## Docker Image (Mac/Linux)
+```bash
+docker run -d --name dbx-studio1 -p 3000:3000 -p 3002:3002 -v "$(pwd)/app_data:/app/data" -v "$(pwd)/api_data:/app/apps/api/data" dbx25/dbx-studio1:latest
+```
+
 ## Electron App
 
 ### 1. Install Dependencies
