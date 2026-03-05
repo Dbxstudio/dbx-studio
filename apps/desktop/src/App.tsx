@@ -69,7 +69,29 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-    const { isAuthenticated, isLoading, logout } = useAuth()
+    const { isAuthenticated, isLoading, logout, token, user } = useAuth()
+
+    // Handle immediate redirect for already-authenticated users
+    useEffect(() => {
+        if (isAuthenticated && token && user) {
+            const searchParams = new URLSearchParams(window.location.search);
+            const redirectUrl = searchParams.get('redirect');
+            if (redirectUrl) {
+                try {
+                    const targetUrl = new URL(redirectUrl);
+                    targetUrl.searchParams.set('token', token);
+                    targetUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(user)));
+
+                    const refreshToken = localStorage.getItem('dbx_refresh_token');
+                    if (refreshToken) targetUrl.searchParams.set('refreshToken', refreshToken);
+
+                    window.location.href = targetUrl.toString();
+                } catch (e) {
+                    console.error("Invalid redirect URL", e);
+                }
+            }
+        }
+    }, [isAuthenticated, token, user]);
 
     // Show loading while checking auth
     if (isLoading) {

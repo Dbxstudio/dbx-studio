@@ -54,6 +54,22 @@ export function Login({ onSuccess }: LoginProps) {
     const [authLoadingMessage, setAuthLoadingMessage] = useState('Authenticating...')
     const [useCognito, setUseCognito] = useState(true) // Use Cognito by default
 
+    // Redirect local users to main site for authentication
+    useEffect(() => {
+        const hostname = window.location.hostname;
+        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+        const searchParams = new URLSearchParams(window.location.search);
+
+        // Skip redirect if we're rendering to handle a returned token
+        const hasToken = searchParams.has('token');
+
+        if (isLocal && !hasToken) {
+            const targetParams = new URLSearchParams();
+            targetParams.set('redirect', window.location.origin);
+            window.location.href = `https://www.dbxstudio.com/login?${targetParams.toString()}`;
+        }
+    }, []);
+
     // Clear errors after timeout
     useEffect(() => {
         if (errorMessage) {
@@ -137,7 +153,19 @@ export function Login({ onSuccess }: LoginProps) {
                     localStorage.setItem('dbx_user_info', JSON.stringify(syncResult.user))
 
                     setLoginSuccess(true)
-                    setTimeout(() => window.location.reload(), 1500)
+                    setTimeout(() => {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const redirectUrl = urlParams.get('redirect');
+                        if (redirectUrl) {
+                            const targetUrl = new URL(redirectUrl);
+                            targetUrl.searchParams.set('token', signInResult.token!);
+                            targetUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(syncResult.user)));
+                            if (signInResult.refreshToken) targetUrl.searchParams.set('refreshToken', signInResult.refreshToken);
+                            window.location.href = targetUrl.toString();
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 1500)
                 }
             }
         } catch (error) {
@@ -174,7 +202,19 @@ export function Login({ onSuccess }: LoginProps) {
                     localStorage.setItem('dbx_user_info', JSON.stringify(syncResult.user))
 
                     setLoginSuccess(true)
-                    setTimeout(() => window.location.reload(), 1500)
+                    setTimeout(() => {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const redirectUrl = urlParams.get('redirect');
+                        if (redirectUrl) {
+                            const targetUrl = new URL(redirectUrl);
+                            targetUrl.searchParams.set('token', result.token!);
+                            targetUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(syncResult.user)));
+                            if (result.refreshToken) targetUrl.searchParams.set('refreshToken', result.refreshToken);
+                            window.location.href = targetUrl.toString();
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 1500)
                 } else {
                     throw new Error(syncResult.error || 'Backend sync failed')
                 }
@@ -252,7 +292,17 @@ export function Login({ onSuccess }: LoginProps) {
 
             // Trigger success callback
             setTimeout(() => {
-                onSuccess?.()
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectUrl = urlParams.get('redirect');
+                if (redirectUrl) {
+                    const targetUrl = new URL(redirectUrl);
+                    targetUrl.searchParams.set('token', data.token || token);
+                    targetUrl.searchParams.set('user', encodeURIComponent(JSON.stringify(userInfo)));
+                    if (refreshToken) targetUrl.searchParams.set('refreshToken', refreshToken);
+                    window.location.href = targetUrl.toString();
+                } else {
+                    onSuccess?.()
+                }
             }, 1500)
 
         } catch (error) {

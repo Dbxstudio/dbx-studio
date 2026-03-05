@@ -28,6 +28,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Initialize from localStorage using authTokenManager
     useEffect(() => {
+        // Check URL for tokens (if redirected from live site)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        const urlUser = urlParams.get('user');
+        const urlRefreshToken = urlParams.get('refreshToken');
+
+        if (urlToken && urlUser) {
+            try {
+                const parsedUser = JSON.parse(decodeURIComponent(urlUser));
+                setCustomAuthToken(urlToken, parsedUser, urlRefreshToken || null);
+                setToken(urlToken);
+                setUser(parsedUser);
+                console.log('✅ [AuthContext] User logged in from redirect URL');
+                
+                // Cleanup URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setIsLoading(false);
+                return;
+            } catch (e) {
+                console.error("❌ [AuthContext] Failed to parse user from redirect URL", e);
+            }
+        }
+
         const storedToken = getAuthToken()
         const storedUser = getUserInfo()
 
@@ -41,20 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(storedToken)
             setUser(storedUser)
         } else {
-            // Auto-login with default guest user (no login required)
-            const defaultToken = 'guest_token_' + Math.random().toString(36).substr(2, 9)
-            const defaultUser: UserInfo = {
-                user_id: 'guest_user',
-                firebase_user_id: 'guest_user',
-                email: 'guest@dbxstudio.local',
-                first_name: 'Guest',
-                last_name: 'User',
-                profile_pic_url: null
-            }
-            setCustomAuthToken(defaultToken, defaultUser, null)
-            setToken(defaultToken)
-            setUser(defaultUser)
-            console.log('✅ [AuthContext] Initialized as guest user (no login required)')
+            console.log('ℹ️ [AuthContext] No valid token found, user needs to login')
         }
 
         setIsLoading(false)
