@@ -60,7 +60,7 @@ export function AIChat({
 
     // AI Settings
     const [selectedProvider, setSelectedProvider] = useState(
-        localStorage.getItem('ai_selected_provider') || 'dbx-agent'
+        localStorage.getItem('ai_selected_provider') || 'bedrock'
     )
     const [selectedModelId, setSelectedModelId] = useState(
         parseInt(localStorage.getItem('ai_selected_model_id') || '801', 10)
@@ -373,7 +373,7 @@ export function AIChat({
                     <Sparkles size={16} color="#4a9eff" />
                     <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff' }}>Copilot</h3>
                     <span style={{ fontSize: '11px', color: '#9fb0c8', background: '#2a2a2a', border: '1px solid #3a3a3a', padding: '3px 8px', borderRadius: '4px', fontWeight: 500 }}>
-                        DBX Agent
+                        {currentProvider?.name || 'Copilot'}
                     </span>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -592,23 +592,6 @@ export function AIChat({
                         </div>
                     )}
 
-                    {/* DBX Agent Info */}
-                    {selectedProvider === 'dbx-agent' && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '10px 12px',
-                            background: '#1a1a1a',
-                            border: '1px solid #3a3a3a',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            color: '#9fb0c8',
-                        }}>
-                            <AlertCircle size={14} />
-                            <span>DBX Agent uses server-side processing. No API keys required!</span>
-                        </div>
-                    )}
 
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>

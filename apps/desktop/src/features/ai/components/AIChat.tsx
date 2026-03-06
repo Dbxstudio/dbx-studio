@@ -664,12 +664,7 @@ export function AIChat({ isOpen, onClose, onRunQuery, connectionId, externalConn
                         </div>
                     )}
 
-                    {selectedProvider === 'dbx-agent' && (
-                        <div className="ai-info-box">
-                            <AlertCircle size={14} />
-                            <span>DBX Agent uses server-side processing. No API keys required!</span>
-                        </div>
-                    )}
+
 
                     <div className="ai-settings-actions">
                         <button className="ai-settings-save" onClick={handleSaveSettings}>
