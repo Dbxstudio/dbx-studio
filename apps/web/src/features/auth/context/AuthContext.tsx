@@ -9,6 +9,9 @@ import {
     type UserInfo
 } from '../../../shared/utils/authTokenManager'
 
+// Import Amplify signOut to clear the Cognito session on local logout
+import { signOut as amplifySignOut } from 'aws-amplify/auth'
+
 interface AuthContextType {
     user: UserInfo | null
     token: string | null
@@ -41,7 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setToken(urlToken);
                 setUser(parsedUser);
                 console.log('✅ [AuthContext] User logged in from redirect URL');
-                
+
+                // Clear any explicit logout flag since we just logged in via redirect
+                localStorage.removeItem('dbx_explicit_logout');
+
                 // Cleanup URL
                 window.history.replaceState({}, document.title, window.location.pathname);
                 setIsLoading(false);
@@ -54,15 +60,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedToken = getAuthToken()
         const storedUser = getUserInfo()
 
-        if (storedToken && storedUser && isTokenValid()) {
-            setToken(storedToken)
-            setUser(storedUser)
-            console.log('✅ [AuthContext] User restored from storage')
-        } else if (storedToken && storedUser) {
-            // Token exists but might be expired, try to refresh
-            console.log('⚠️ [AuthContext] Token may be expired, will try to refresh on next request')
-            setToken(storedToken)
-            setUser(storedUser)
+        // If the user explicitly logged out locally, don't auto-restore session
+        // This prevents the auto-login loop where local logout triggers immediate re-login
+        const isExplicitlyLoggedOut = localStorage.getItem('dbx_explicit_logout') === 'true';
+
+        if (storedToken && storedUser && !isExplicitlyLoggedOut) {
+            if (isTokenValid()) {
+                setToken(storedToken)
+                setUser(storedUser)
+                console.log('✅ [AuthContext] User restored from storage')
+            } else {
+                // Token exists but might be expired
+                console.log('⚠️ [AuthContext] Token may be expired, will try to refresh on next request')
+                setToken(storedToken)
+                setUser(storedUser)
+            }
+        } else if (isExplicitlyLoggedOut) {
+            console.log('🔒 [AuthContext] Explicit logout detected — skipping auto-restore')
         } else {
             console.log('ℹ️ [AuthContext] No valid token found, user needs to login')
         }
@@ -78,16 +92,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(newToken)
         setUser(newUser)
 
+        localStorage.removeItem('dbx_explicit_logout')
         console.log('✅ [AuthContext] User logged in:', newUser.email)
     }, [])
 
     const logout = useCallback(() => {
-        // Clear using authTokenManager
+        // CRITICAL: Set the explicit logout flag FIRST, before any state updates
+        // This ensures the Login component's useEffect sees the flag BEFORE it can redirect
+        localStorage.setItem('dbx_explicit_logout', 'true')
+
+        // Clear using authTokenManager (removes all tokens from localStorage)
         clearAuthToken()
 
         // Clear context state
         setToken(null)
         setUser(null)
+
+        // Also sign out from Amplify/Cognito so it cannot silently issue new tokens
+        amplifySignOut({ global: false }).catch(() => {
+            // Ignore errors - we still want local logout to succeed even if Amplify fails
+        })
 
         console.log('🔓 [AuthContext] User logged out')
     }, [])

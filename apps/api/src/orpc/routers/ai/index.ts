@@ -663,7 +663,7 @@ export const getCredentials = orpc
             success: true,
             status: 'success',
             credentials: {
-                selectedProvider: storedCredentials.selectedProvider || 'dbx-agent',
+                selectedProvider: storedCredentials.selectedProvider || 'bedrock',
                 selectedModel: storedCredentials.selectedModel || '',
                 selectedModelId: storedCredentials.selectedModelId || '801',
                 AWS_ACCESS_KEY_ID: storedCredentials.AWS_ACCESS_KEY_ID ? '***configured***' : '',

@@ -28,13 +28,6 @@ export interface Model {
 // Only supported providers
 export const PROVIDERS: Provider[] = [
     {
-        id: 'dbx-agent',
-        name: 'DBX Agent',
-        description: 'DBX Agent Query Analyzer (Server-side, Recommended)',
-        serviceId: 8,
-        requiresCredentials: false, // Uses server credentials
-    },
-    {
         id: 'bedrock',
         name: 'AWS Bedrock',
         description: 'Amazon Bedrock AI models (Claude, Llama)',
@@ -59,13 +52,6 @@ export const PROVIDERS: Provider[] = [
 
 // Models for supported providers
 export const MODELS: Model[] = [
-    // DBX Agent models (Query Analyzer) - Server-side, no credentials needed
-    { modelId: 801, providerId: 'dbx-agent', label: 'Max', modelName: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' },
-    { modelId: 802, providerId: 'dbx-agent', label: 'Max (Thinking)', modelName: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', isThinking: true },
-    { modelId: 803, providerId: 'dbx-agent', label: 'Pro', modelName: 'gpt-oss-120b' },
-    { modelId: 804, providerId: 'dbx-agent', label: 'Pro (Thinking)', modelName: 'gpt-oss-120b', isThinking: true },
-    { modelId: 805, providerId: 'dbx-agent', label: 'Lite', modelName: 'qwen.qwen3-235b-a22b-2507-v1:0' },
-
     // AWS Bedrock models
     { modelId: 1, providerId: 'bedrock', label: 'Claude 3 Haiku', modelName: 'us.anthropic.claude-3-haiku-20240307-v1:0' },
     { modelId: 2, providerId: 'bedrock', label: 'Claude 3 Sonnet', modelName: 'us.anthropic.claude-3-sonnet-20240229-v1:0' },
@@ -107,7 +93,7 @@ export function getModelById(modelId: number): Model | undefined {
 }
 
 export function getDefaultProvider(): Provider {
-    return PROVIDERS[0] // dbx-agent
+    return PROVIDERS[0]
 }
 
 export function getDefaultModel(providerId: string): Model | undefined {
@@ -128,8 +114,6 @@ export function providerRequiresCredentials(providerId: string): boolean {
  */
 export function getCredentialFieldsForProvider(providerId: string): string[] {
     switch (providerId) {
-        case 'dbx-agent':
-            return [] // No credentials needed - uses server
         case 'bedrock':
             return ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION']
         case 'openai':
