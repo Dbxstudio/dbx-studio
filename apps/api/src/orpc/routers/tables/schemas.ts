@@ -5,7 +5,10 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSupabaseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -31,8 +34,11 @@ export const schemas = orpc
 
         try {
             switch (connection.type) {
-                case 'postgresql': {
-                    const kysely = createPostgresConnection(connection)
+                case 'postgresql':
+                case 'supabase': {
+                    const kysely = connection.type === 'supabase'
+                        ? createSupabaseConnection(connection)
+                        : createPostgresConnection(connection)
                     const result = await sql<{ schema_name: string }>`
                         SELECT schema_name
                         FROM information_schema.schemata
@@ -94,6 +100,16 @@ export const schemas = orpc
 
                     return schemas.map(row => ({
                         name: row.schema_name,
+                        tables: [],
+                    }))
+                }
+
+                case 'snowflake': {
+                    const client = createSnowflakeConnection(connection)
+                    const result = await executeSnowflakeQuery(client, 'SHOW SCHEMAS')
+
+                    return (result as Array<{ name: string }>).map((row) => ({
+                        name: row.name,
                         tables: [],
                     }))
                 }

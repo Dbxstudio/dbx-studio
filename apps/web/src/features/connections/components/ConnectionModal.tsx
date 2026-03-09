@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ConnectionTypeSelector, type ConnectionType } from './ConnectionTypeSelector'
 import { PostgresConnectionModal } from './PostgresConnectionModal'
 import { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
+import { SupabaseConnectionModal } from './SupabaseConnectionModal'
 import type { CreateConnectionInput } from '../../../shared/hooks'
 import './connection-modal.css'
 
@@ -105,6 +106,19 @@ export function ConnectionModal({
                 />
             )
 
+        case 'supabase':
+            return (
+                <SupabaseConnectionModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onBack={handleBack}
+                    onSaveSuccess={onSaveSuccess}
+                    userId={userId}
+                    isEditing={isEditing}
+                    existingConnection={existingConnection}
+                />
+            )
+
         // For unsupported types, fall back to type selector
         default:
             return (
@@ -121,3 +135,4 @@ export function ConnectionModal({
 export { ConnectionTypeSelector } from './ConnectionTypeSelector'
 export { PostgresConnectionModal } from './PostgresConnectionModal'
 export { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
+export { SupabaseConnectionModal } from './SupabaseConnectionModal'

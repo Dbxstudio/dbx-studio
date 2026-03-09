@@ -5,7 +5,10 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createSupabaseConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -92,6 +95,36 @@ export const list = orpc
                     return rows.map(row => ({
                         name: row.name,
                         type: row.engine.includes('View') ? 'view' : 'table',
+                    }))
+                }
+
+                case 'snowflake': {
+                    const conn = createSnowflakeConnection(connection)
+                    const database = connection.database || ''
+                    const schema = input.schema || 'PUBLIC'
+                    const querySql = database
+                        ? `SHOW TABLES IN "${database}"."${schema.toUpperCase()}"`
+                        : `SHOW TABLES IN SCHEMA "${schema.toUpperCase()}"`
+                    const sfRows = await executeSnowflakeQuery(conn, querySql) as any[]
+                    return sfRows.map((row: any) => ({
+                        name: row.name || row['name'] || '',
+                        type: 'table' as const,
+                    }))
+                }
+
+                case 'supabase': {
+                    // Supabase = PostgreSQL, same query but against their schemas
+                    const kysely = createSupabaseConnection(connection)
+                    const result = await sql<{ table_name: string; table_type: string }>`
+                        SELECT table_name, table_type 
+                        FROM information_schema.tables 
+                        WHERE table_schema = ${input.schema}
+                        AND table_type IN ('BASE TABLE', 'VIEW')
+                        ORDER BY table_name
+                    `.execute(kysely)
+                    return result.rows.map(row => ({
+                        name: row.table_name,
+                        type: row.table_type === 'VIEW' ? 'view' : 'table',
                     }))
                 }
 

@@ -5,7 +5,10 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createSupabaseConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -209,6 +212,58 @@ export const data = orpc
 
                     return {
                         rows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'snowflake': {
+                    const conn = createSnowflakeConnection(connection)
+                    const database = connection.database || ''
+                    const schema = input.schema || 'PUBLIC'
+                    const fullTableName = database
+                        ? `"${database}"."${schema.toUpperCase()}"."${input.tableName.toUpperCase()}"`
+                        : `"${schema.toUpperCase()}"."${input.tableName.toUpperCase()}"`
+
+                    const countRows = await executeSnowflakeQuery(conn, `SELECT COUNT(*) as cnt FROM ${fullTableName}`) as any[]
+                    const total = parseInt(countRows[0]?.CNT || countRows[0]?.cnt || '0', 10)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY "${input.orderBy}" ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+                    const sfRows = await executeSnowflakeQuery(conn,
+                        `SELECT * FROM ${fullTableName} ${orderClause} LIMIT ${input.pageSize} OFFSET ${offset}`
+                    ) as unknown[]
+
+                    return {
+                        rows: sfRows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'supabase': {
+                    const kysely = createSupabaseConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
+                    const whereClause = buildPostgresWhereClause(input.filters)
+
+                    const countQuery = `SELECT COUNT(*) as count FROM ${fullTableName} ${whereClause}`
+                    const countResult = await sql<{ count: string }>`${sql.raw(countQuery)}`.execute(kysely)
+                    const total = parseInt(countResult.rows[0]?.count || '0', 10)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY "${input.orderBy}" ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+
+                    const dataQuery = `SELECT * FROM ${fullTableName} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`
+                    const dataResult = await sql`${sql.raw(dataQuery)}`.execute(kysely)
+
+                    return {
+                        rows: dataResult.rows,
                         total,
                         page: input.page,
                         pageSize: input.pageSize,

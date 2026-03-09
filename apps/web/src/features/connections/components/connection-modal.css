@@ -164,6 +164,10 @@
     color: #29B5E8;
 }
 
+.connection-type-icon.supabase {
+    color: #3ECF8E;
+}
+
 .connection-type-icon.mariadb {
     color: #C0765A;
 }
@@ -539,4 +543,61 @@
     .connection-type-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Supabase Styles */
+.supabase-info-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background-color: rgba(62, 207, 142, 0.08);
+    border: 1px solid rgba(62, 207, 142, 0.25);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #a3cfb8;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.method-tabs {
+    display: flex;
+    gap: 0;
+    border: 1px solid #444;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.method-tab {
+    flex: 1;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: #999;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.method-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+}
+
+.method-tab.active {
+    background: #3ECF8E;
+    color: #0a0a0a;
+    font-weight: 600;
+}
+
+.supabase-btn {
+    background-color: #3ECF8E !important;
+    border-color: #2db97a !important;
+    color: #0a0a0a !important;
+}
+
+.supabase-btn:hover:not(:disabled) {
+    background-color: #2db97a !important;
+    transform: translateY(-1px);
 }

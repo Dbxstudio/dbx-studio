@@ -8,7 +8,7 @@ import { MAIN_SERVER_ENDPOINT } from '../constants/serverConfig'
 export interface Connection {
     id: string
     name: string
-    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake'
+    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake' | 'supabase'
     userId?: string
     host?: string
     port?: number
@@ -42,6 +42,7 @@ export interface CreateConnectionInput {
     role?: string
     label?: string
     color?: string
+    connectionString?: string
 }
 
 // Query Keys
@@ -113,6 +114,14 @@ export function useCreateConnection() {
                     // Snowflake uses account instead of host
                     const account = input.account || ''
                     connectionString = `snowflake://${username}:${password}@${account}${database ? '/' + database : ''}`
+                } else if (input.type === 'supabase') {
+                    // Supabase uses connection string directly or builds from fields
+                    driver = 'postgres'
+                    if (input.connectionString) {
+                        connectionString = input.connectionString
+                    } else {
+                        connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+                    }
                 } else {
                     connectionString = `${driver}://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
                 }

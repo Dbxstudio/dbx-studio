@@ -15,7 +15,7 @@ import {
 } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSqlite, SiMariadb, SiSnowflake, SiClickhouse } from 'react-icons/si'
+import { SiSqlite, SiMariadb, SiSnowflake, SiClickhouse, SiSupabase } from 'react-icons/si'
 import { GoSidebarCollapse } from 'react-icons/go'
 import { TbDatabasePlus, TbSchema } from 'react-icons/tb'
 import { useQueryClient } from '@tanstack/react-query'
@@ -80,6 +80,8 @@ const getDatabaseIcon = (dialect: string, size = 16) => {
         return <SiSnowflake size={size - 2} className="db-type-icon snowflake" />
     } else if (dialectLower === 'clickhouse') {
         return <SiClickhouse size={size} className="db-type-icon clickhouse" />
+    } else if (dialectLower === 'supabase') {
+        return <SiSupabase size={size} className="db-type-icon supabase" />
     }
 
     return <TbSchema size={size} className="db-type-icon default" />

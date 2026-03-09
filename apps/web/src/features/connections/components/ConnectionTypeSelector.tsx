@@ -1,10 +1,10 @@
 import { FaTimes, FaDatabase } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSnowflake, SiSqlite, SiMariadb } from 'react-icons/si'
+import { SiSnowflake, SiSqlite, SiMariadb, SiSupabase } from 'react-icons/si'
 import './connection-modal.css'
 
-export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake'
+export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase'
 
 interface ConnectionTypeConfig {
     type: ConnectionType
@@ -22,11 +22,16 @@ const connectionTypes: ConnectionTypeConfig[] = [
         description: 'Connect to PostgreSQL database'
     },
     {
+        type: 'supabase',
+        name: 'Supabase',
+        icon: <SiSupabase size={40} className="connection-type-icon supabase" />,
+        description: 'Connect to Supabase project'
+    },
+    {
         type: 'snowflake',
         name: 'Snowflake',
         icon: <SiSnowflake size={40} className="connection-type-icon snowflake" />,
         description: 'Connect to Snowflake Data Cloud',
-        comingSoon: true
     },
     {
         type: 'mysql',

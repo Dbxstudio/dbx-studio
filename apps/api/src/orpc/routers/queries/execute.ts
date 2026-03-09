@@ -5,7 +5,10 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createSupabaseConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -67,6 +70,19 @@ export const execute = orpc
                         format: 'JSONEachRow',
                     })
                     rows = await result.json()
+                    break
+                }
+
+                case 'snowflake': {
+                    const conn = createSnowflakeConnection(connection)
+                    rows = await executeSnowflakeQuery(conn, input.sql)
+                    break
+                }
+
+                case 'supabase': {
+                    const kysely = createSupabaseConnection(connection)
+                    const result = await sql.raw(input.sql).execute(kysely)
+                    rows = result.rows as unknown[]
                     break
                 }
 

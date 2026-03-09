@@ -9,13 +9,18 @@ import {
     createMysqlConnection,
     createTempMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createTempSnowflakeConnection,
+    createSupabaseConnection,
+    createTempSupabaseConnection,
 } from '~/kysely/connections'
 
 const testConnectionSchema = z.object({
     id: z.string().optional(),
     // Allow testing with connection details directly
-    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake']).optional(),
+    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase']).optional(),
     host: z.string().optional(),
     port: z.number().optional(),
     database: z.string().optional(),
@@ -116,10 +121,37 @@ export const test = orpc
                 }
 
                 case 'snowflake': {
-                    // Snowflake requires special SDK, placeholder for now
-                    throw new ORPCError('NOT_IMPLEMENTED', {
-                        message: 'Snowflake connection testing not yet implemented',
-                    })
+                    if (isExistingConnection) {
+                        const client = createSnowflakeConnection(connectionConfig as any)
+                        await executeSnowflakeQuery(client, 'SELECT 1 AS test')
+                    } else {
+                        const client = createTempSnowflakeConnection(connectionConfig)
+                        try {
+                            await executeSnowflakeQuery(client, 'SELECT 1 AS test')
+                        } finally {
+                            if ((client as any).isUp()) {
+                                await new Promise<void>((resolve) => {
+                                    (client as any).destroy(() => resolve())
+                                })
+                            }
+                        }
+                    }
+                    break
+                }
+
+                case 'supabase': {
+                    if (isExistingConnection) {
+                        const kysely = createSupabaseConnection(connectionConfig as any)
+                        await sql`SELECT 1 as test`.execute(kysely)
+                    } else {
+                        const { kysely, pool } = createTempSupabaseConnection(connectionConfig)
+                        try {
+                            await sql`SELECT 1 as test`.execute(kysely)
+                        } finally {
+                            await pool.end()
+                        }
+                    }
+                    break
                 }
 
                 default:
