@@ -1,5 +1,5 @@
 ---
-name: sql-queries
+name: sql-queries-tool
 description: Expert SQL query generation for DBX Studio. Use when writing, optimizing, or debugging SQL queries against user database connections.
 ---
 
