@@ -2,6 +2,9 @@
 name: ai-tools
 description: Reference for all AI tools available in DBX Studio's AI chat system. Use when adding, modifying, or debugging AI tool definitions, tool execution, or provider integrations.
 user-invocable: false
+source:
+  type: repository
+  repository: Dbxstudio/dbx-studio
 ---
 
 # DBX Studio AI Tools Reference

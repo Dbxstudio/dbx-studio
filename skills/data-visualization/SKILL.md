@@ -1,6 +1,9 @@
 ---
 name: data-visualization-tool
 description: Chart and visualization generation for DBX Studio. Use when a user wants to visualize data — bar charts, line graphs, pie charts, scatter plots, etc.
+source:
+  type: repository
+  repository: Dbxstudio/dbx-studio
 ---
 
 # Data Visualization — DBX Studio

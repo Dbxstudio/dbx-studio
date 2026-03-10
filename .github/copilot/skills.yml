@@ -1,0 +1,25 @@
+version: 1
+source:
+  type: repository
+  repository: Dbxstudio/dbx-studio
+
+skills:
+  - name: ai-tools
+    description: Reference for all AI tools available in DBX Studio's AI chat system. Use when adding, modifying, or debugging AI tool definitions, tool execution, or provider integrations.
+    path: skills/ai-tools/SKILL.md
+
+  - name: data-exploration-tool
+    description: Systematic database and table profiling for DBX Studio. Use when a user wants to understand their data, explore schema structure, or profile a dataset.
+    path: skills/data-exploration/SKILL.md
+
+  - name: data-visualization-tool
+    description: Chart and visualization generation for DBX Studio. Use when a user wants to visualize data — bar charts, line graphs, pie charts, scatter plots, etc.
+    path: skills/data-visualization/SKILL.md
+
+  - name: sql-queries-tool
+    description: Expert SQL query generation for DBX Studio. Use when writing, optimizing, or debugging SQL queries against user database connections.
+    path: skills/sql-queries/SKILL.md
+
+  - name: system-prompt
+    description: Edit or improve the AI system prompt used in DBX Studio's AI chat. Invoke when the user wants to change how the AI responds, its tone, tool usage order, or response format.
+    path: skills/system-prompt/SKILL.md

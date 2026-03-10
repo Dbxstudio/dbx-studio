@@ -1,6 +1,9 @@
 ---
 name: system-prompt
 description: Edit or improve the AI system prompt used in DBX Studio's AI chat. Invoke when the user wants to change how the AI responds, its tone, tool usage order, or response format.
+source:
+  type: repository
+  repository: Dbxstudio/dbx-studio
 ---
 
 # System Prompt Editor — DBX Studio
