@@ -70,12 +70,15 @@ export default function App() {
 
 function AuthenticatedApp() {
     const { isAuthenticated, isLoading, logout, token, user } = useAuth()
+    const [pendingRedirect, setPendingRedirect] = useState<{ url: string, forceLogin: boolean } | null>(null)
 
     // Handle immediate redirect for already-authenticated users
     useEffect(() => {
         if (isAuthenticated && token && user) {
             const searchParams = new URLSearchParams(window.location.search);
             const redirectUrl = searchParams.get('redirect');
+            const forceLogin = searchParams.get('force_login') === 'true';
+
             if (redirectUrl) {
                 try {
                     const targetUrl = new URL(redirectUrl);
@@ -85,7 +88,13 @@ function AuthenticatedApp() {
                     const refreshToken = localStorage.getItem('dbx_refresh_token');
                     if (refreshToken) targetUrl.searchParams.set('refreshToken', refreshToken);
 
-                    window.location.href = targetUrl.toString();
+                    if (forceLogin) {
+                        // Pause the redirect so the user can see options
+                        setPendingRedirect({ url: targetUrl.toString(), forceLogin: true });
+                    } else {
+                        // Immediate redirect for seamless SSO
+                        window.location.href = targetUrl.toString();
+                    }
                 } catch (e) {
                     console.error("Invalid redirect URL", e);
                 }
@@ -105,6 +114,35 @@ function AuthenticatedApp() {
     // Show login if not authenticated
     if (!isAuthenticated) {
         return <Login onSuccess={() => window.location.reload()} />
+    }
+
+    // INTERMEDIATE SCREEN for force_login: "Continue as user" vs "Switch Account"
+    if (pendingRedirect) {
+        return (
+            <div className="query-main-container" style={{ alignItems: 'center', justifyContent: 'center', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ background: '#1c1c1c', padding: '40px', borderRadius: '12px', border: '1px solid #333', textAlign: 'center', color: '#fff', maxWidth: '400px' }}>
+                    <h2 style={{ marginBottom: '10px' }}>Sign in to DBX Studio</h2>
+                    <p style={{ color: '#aaa', marginBottom: '30px' }}>You are currently signed in as <strong>{user?.email}</strong>. Do you want to continue?</p>
+
+                    <button
+                        onClick={() => window.location.href = pendingRedirect.url}
+                        style={{ display: 'block', width: '100%', padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', marginBottom: '15px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                        Continue as {user?.first_name || user?.email}
+                    </button>
+
+                    <button
+                        onClick={async () => {
+                            await logout();
+                            window.location.reload();
+                        }}
+                        style={{ display: 'block', width: '100%', padding: '12px', background: 'transparent', color: '#aaa', border: '1px solid #555', borderRadius: '6px', cursor: 'pointer' }}
+                    >
+                        Switch Account / Sign in with different ID
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     // Show main app

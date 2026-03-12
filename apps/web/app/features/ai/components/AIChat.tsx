@@ -22,19 +22,19 @@ interface AIChatProps {
 }
 
 export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
-    const [messages, setMessages] = useState<Array<{id: string, role: 'user'|'assistant', content: string, timestamp: Date}>>([])
+    const [messages, setMessages] = useState<Array<{ id: string, role: 'user' | 'assistant', content: string, timestamp: Date }>>([])
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [showSettings, setShowSettings] = useState(false)
-    
+
     // AI Settings
     const [selectedProvider, setSelectedProvider] = useState(
-        localStorage.getItem('ai_selected_provider') || 'dbx-agent'
+        localStorage.getItem('ai_selected_provider') || 'bedrock'
     )
     const [selectedModelId, setSelectedModelId] = useState(
-        parseInt(localStorage.getItem('ai_selected_model_id') || '801', 10)
+        parseInt(localStorage.getItem('ai_selected_model_id') || '1', 10)
     )
-    
+
     // Credentials state
     const [credentials, setCredentials] = useState({
         AWS_ACCESS_KEY_ID: localStorage.getItem('ai_aws_access_key_id') || '',
@@ -43,19 +43,19 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
         OPENAI_API_KEY: localStorage.getItem('ai_openai_api_key') || '',
         ANTHROPIC_API_KEY: localStorage.getItem('ai_anthropic_api_key') || '',
     })
-    
+
     const inputRef = useRef<HTMLTextAreaElement>(null)
-    
+
     // Get provider models and info
     const providerModels = getModelsByProvider(selectedProvider)
     const currentProvider = getProviderById(selectedProvider)
     const currentModel = MODELS.find(m => m.modelId === selectedModelId)
     const requiresCredentials = providerRequiresCredentials(selectedProvider)
-    
+
     // Check if credentials are configured
     const hasCredentials = useCallback(() => {
         if (!requiresCredentials) return true
-        
+
         switch (selectedProvider) {
             case 'bedrock':
                 return !!(credentials.AWS_ACCESS_KEY_ID && credentials.AWS_SECRET_ACCESS_KEY)
@@ -67,7 +67,7 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                 return true
         }
     }, [selectedProvider, credentials, requiresCredentials])
-    
+
     const handleSaveSettings = () => {
         // Save to localStorage
         localStorage.setItem('ai_selected_provider', selectedProvider)
@@ -77,7 +77,7 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
         localStorage.setItem('ai_aws_region', credentials.AWS_REGION)
         localStorage.setItem('ai_openai_api_key', credentials.OPENAI_API_KEY)
         localStorage.setItem('ai_anthropic_api_key', credentials.ANTHROPIC_API_KEY)
-        
+
         setShowSettings(false)
     }
 
@@ -95,7 +95,7 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
         }
         setMessages(prev => [...prev, userMsg])
         setInput('')
-        
+
         // Simulate agent response
         setTimeout(() => {
             const assistantMsg = {
@@ -137,14 +137,14 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                 flexShrink: 0,
                 gap: '12px',
             }}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Sparkles size={16} color="#4a9eff" />
-                    <h3 style={{margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff'}}>Copilot</h3>
-                    <span style={{fontSize: '11px', color: '#9fb0c8', background: '#2a2a2a', border: '1px solid #3a3a3a', padding: '3px 8px', borderRadius: '4px', fontWeight: 500}}>
-                        DBX Agent
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#fff' }}>Copilot</h3>
+                    <span style={{ fontSize: '11px', color: '#9fb0c8', background: '#2a2a2a', border: '1px solid #3a3a3a', padding: '3px 8px', borderRadius: '4px', fontWeight: 500 }}>
+                        {currentProvider?.name || 'Copilot'}
                     </span>
                 </div>
-                <div style={{display: 'flex', gap: '6px'}}>
+                <div style={{ display: 'flex', gap: '6px' }}>
                     {messages.length > 0 && (
                         <button
                             onClick={() => setMessages([])}
@@ -216,8 +216,8 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                     overflowY: 'auto',
                     flexShrink: 0,
                 }}>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                        <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>Provider</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>Provider</label>
                         <select
                             value={selectedProvider}
                             onChange={(e) => setSelectedProvider(e.target.value)}
@@ -236,11 +236,11 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                                 </option>
                             ))}
                         </select>
-                        <span style={{fontSize: '11px', color: '#9fb0c8'}}>{currentProvider?.description}</span>
+                        <span style={{ fontSize: '11px', color: '#9fb0c8' }}>{currentProvider?.description}</span>
                     </div>
 
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                        <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>Model</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>Model</label>
                         <select
                             value={selectedModelId}
                             onChange={(e) => setSelectedModelId(parseInt(e.target.value, 10))}
@@ -263,8 +263,8 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
 
                     {/* OpenAI Credentials */}
                     {selectedProvider === 'openai' && (
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                            <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>OpenAI API Key</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>OpenAI API Key</label>
                             <input
                                 type="password"
                                 value={credentials.OPENAI_API_KEY}
@@ -284,8 +284,8 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
 
                     {/* Anthropic Credentials */}
                     {selectedProvider === 'claude' && (
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                            <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>Anthropic API Key</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>Anthropic API Key</label>
                             <input
                                 type="password"
                                 value={credentials.ANTHROPIC_API_KEY}
@@ -305,9 +305,9 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
 
                     {/* AWS Bedrock Credentials */}
                     {selectedProvider === 'bedrock' && (
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                                <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>AWS Access Key ID</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>AWS Access Key ID</label>
                                 <input
                                     type="text"
                                     value={credentials.AWS_ACCESS_KEY_ID}
@@ -323,8 +323,8 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                                     }}
                                 />
                             </div>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                                <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>AWS Secret Access Key</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>AWS Secret Access Key</label>
                                 <input
                                     type="password"
                                     value={credentials.AWS_SECRET_ACCESS_KEY}
@@ -340,8 +340,8 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                                     }}
                                 />
                             </div>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                                <label style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8'}}>AWS Region</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8' }}>AWS Region</label>
                                 <input
                                     type="text"
                                     value={credentials.AWS_REGION}
@@ -360,26 +360,10 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                         </div>
                     )}
 
-                    {/* DBX Agent Info */}
-                    {selectedProvider === 'dbx-agent' && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '10px 12px',
-                            background: '#1a1a1a',
-                            border: '1px solid #3a3a3a',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            color: '#9fb0c8',
-                        }}>
-                            <AlertCircle size={14} />
-                            <span>DBX Agent uses server-side processing. No API keys required!</span>
-                        </div>
-                    )}
+
 
                     {/* Action Buttons */}
-                    <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px'}}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
                         <button
                             onClick={handleSaveSettings}
                             style={{
@@ -419,7 +403,7 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                 flex: 1,
                 minHeight: 0,
                 display: 'flex',
-                flexDirection: 'column', 
+                flexDirection: 'column',
                 padding: '16px',
                 gap: '12px',
                 overflowY: 'auto',
@@ -438,37 +422,37 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                         background: '#1a1a1a',
                         borderRadius: '8px',
                     }}>
-                        <span style={{fontSize: '48px', opacity: 1, marginBottom: '12px'}}>✨</span>
-                        <div style={{fontSize: '18px', fontWeight: 600, color: '#ffffff', margin: 0}}>
+                        <span style={{ fontSize: '48px', opacity: 1, marginBottom: '12px' }}>✨</span>
+                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff', margin: 0 }}>
                             AI SQL Assistant
                         </div>
-                        <p style={{fontSize: '14px', lineHeight: '1.5', color: '#d4d4d4', opacity: 1, margin: 0}}>
+                        <p style={{ fontSize: '14px', lineHeight: '1.5', color: '#d4d4d4', opacity: 1, margin: 0 }}>
                             Describe what data you need and I'll generate SQL queries for you.
                         </p>
-                        <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px', maxWidth: '90%', marginLeft: 'auto', marginRight: 'auto'}}>
-                            <div style={{display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4'}}>
-                                <span style={{fontSize: '14px'}}>🔍</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px', maxWidth: '90%', marginLeft: 'auto', marginRight: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4' }}>
+                                <span style={{ fontSize: '14px' }}>🔍</span>
                                 <span>Natural language to SQL</span>
                             </div>
-                            <div style={{display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4'}}>
-                                <span style={{fontSize: '14px'}}>📊</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4' }}>
+                                <span style={{ fontSize: '14px' }}>📊</span>
                                 <span>Schema-aware queries</span>
                             </div>
-                            <div style={{display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4'}}>
-                                <span style={{fontSize: '14px'}}>⚡</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', fontSize: '13px', color: '#d4d4d4' }}>
+                                <span style={{ fontSize: '14px' }}>⚡</span>
                                 <span>Query optimization</span>
                             </div>
                         </div>
-                        <div style={{marginTop: '24px', textAlign: 'left', maxWidth: '90%', marginLeft: 'auto', marginRight: 'auto'}}>
-                            <p style={{fontSize: '12px', fontWeight: 600, color: '#9fb0c8', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 1, margin: 0}}>Try asking:</p>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                                <button onClick={() => setInput('Show me all users who signed up last month')} style={{padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease'}}>
+                        <div style={{ marginTop: '24px', textAlign: 'left', maxWidth: '90%', marginLeft: 'auto', marginRight: 'auto' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 600, color: '#9fb0c8', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 1, margin: 0 }}>Try asking:</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <button onClick={() => setInput('Show me all users who signed up last month')} style={{ padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                                     Show me all users who signed up last month
                                 </button>
-                                <button onClick={() => setInput('What are the top 10 products by revenue?')} style={{padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease'}}>
+                                <button onClick={() => setInput('What are the top 10 products by revenue?')} style={{ padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                                     What are the top 10 products by revenue?
                                 </button>
-                                <button onClick={() => setInput('Count orders grouped by status')} style={{padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease'}}>
+                                <button onClick={() => setInput('Count orders grouped by status')} style={{ padding: '12px 14px', background: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#d4d4d4', fontSize: '13px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                                     Count orders grouped by status
                                 </button>
                             </div>
@@ -512,7 +496,7 @@ export function AIChat({ isOpen, onClose, isDarkTheme = true }: AIChatProps) {
                 background: '#1a1a1a',
                 flexShrink: 0,
             }}>
-                <div style={{position: 'relative', display: 'flex', alignItems: 'flex-end'}}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
                     <textarea
                         ref={inputRef}
                         value={input}

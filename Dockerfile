@@ -33,7 +33,7 @@ EXPOSE 3000 3002
 # Create startup script
 RUN echo '#!/bin/bash\n\
 cd /app/apps/api && bun run src/index.ts &\n\
-cd /app/apps/web && pnpm start &\n\
+cd /app/apps/web && pnpm preview --host 0.0.0.0 --port 3000 &\n\
 wait' > /app/start.sh && chmod +x /app/start.sh
 
 # Start both services

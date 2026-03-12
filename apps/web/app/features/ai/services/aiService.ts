@@ -103,8 +103,8 @@ class AIService {
     private config: AICredentials
 
     constructor() {
-        this.currentProvider = localStorage.getItem(AI_STORAGE_KEYS.SELECTED_PROVIDER) || 'dbx-agent'
-        this.currentModelId = parseInt(localStorage.getItem(AI_STORAGE_KEYS.SELECTED_MODEL_ID) || '801', 10)
+        this.currentProvider = localStorage.getItem(AI_STORAGE_KEYS.SELECTED_PROVIDER) || 'bedrock'
+        this.currentModelId = parseInt(localStorage.getItem(AI_STORAGE_KEYS.SELECTED_MODEL_ID) || '1', 10)
 
         // Get the stored model name, or look it up by ID, or use the default
         const storedModel = localStorage.getItem(AI_STORAGE_KEYS.SELECTED_MODEL)
@@ -198,8 +198,6 @@ class AIService {
                 return !!this.config.ANTHROPIC_API_KEY
             case 'openai':
                 return !!this.config.OPENAI_API_KEY
-            case 'dbx-agent':
-                return true // No credentials required - uses server
             default:
                 return false
         }
@@ -297,12 +295,12 @@ class AIService {
             const model = MODELS.find(m => m.modelId === this.currentModelId)
 
             // Determine which endpoint to use based on provider
-            const isServerSideProvider = this.currentProvider === 'dbx-agent'
+            const isServerSideProvider = false
 
             // Ensure we have a valid model name - default to DBX Agent default model if not found
             // IMPORTANT: Avoid sending 'None', 'null', or 'undefined' as model name
             let modelName = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' // Default fallback
-            
+
             if (model?.modelName && typeof model.modelName === 'string' && model.modelName.trim() !== '') {
                 modelName = model.modelName
                 console.log(`✅ Using model from MODELS array: ${modelName}`)
@@ -315,7 +313,7 @@ class AIService {
                 console.warn(`   - this.currentModel: ${this.currentModel}`)
                 console.warn(`   - this.currentModelId: ${this.currentModelId}`)
             }
-            
+
             const modelId = this.currentModelId || 801
 
             // Build payload - different formats for different endpoints
@@ -377,13 +375,6 @@ class AIService {
                     payload.ANTHROPIC_API_KEY = this.config.ANTHROPIC_API_KEY
                 } else if (this.currentProvider === 'openai') {
                     payload.OPENAI_API_KEY = this.config.OPENAI_API_KEY
-                }
-            } else {
-                // For DBX Agent, include refresh token for automatic token refresh
-                const refreshToken = localStorage.getItem('dbx_refresh_token')
-                if (refreshToken) {
-                    payload.refresh_token = refreshToken
-                    console.log('🔑 Including refresh token for automatic token refresh')
                 }
             }
 
