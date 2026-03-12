@@ -9,6 +9,8 @@ import {
     createSnowflakeConnection,
     executeSnowflakeQuery,
     createSupabaseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -91,7 +93,7 @@ export const list = orpc
                         query_params: { database: connection.database || 'default' },
                         format: 'JSONEachRow',
                     })
-                    const rows = await result.json<{ name: string; engine: string }[]>()
+                    const rows = await result.json() as any[]
                     return rows.map(row => ({
                         name: row.name,
                         type: row.engine.includes('View') ? 'view' : 'table',
@@ -125,6 +127,37 @@ export const list = orpc
                     return result.rows.map(row => ({
                         name: row.table_name,
                         type: row.table_type === 'VIEW' ? 'view' : 'table',
+                    }))
+                }
+
+                case 'redshift': {
+                    // Redshift = PostgreSQL compatibility
+                    const kysely = createRedshiftConnection(connection)
+                    const result = await sql<{ table_name: string; table_type: string }>`
+                        SELECT table_name, table_type 
+                        FROM information_schema.tables 
+                        WHERE table_schema = ${input.schema}
+                        AND table_type IN ('BASE TABLE', 'VIEW')
+                        ORDER BY table_name
+                    `.execute(kysely)
+                    return result.rows.map(row => ({
+                        name: row.table_name,
+                        type: row.table_type === 'VIEW' ? 'view' : 'table',
+                    }))
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+                    const result = await sql<{ name: string; type: string }>`
+                        SELECT name, type 
+                        FROM sqlite_master 
+                        WHERE type IN ('table', 'view') 
+                        AND name NOT LIKE 'sqlite_%'
+                        ORDER BY name
+                    `.execute(kysely)
+                    return result.rows.map(row => ({
+                        name: row.name,
+                        type: row.type === 'view' ? 'view' : 'table',
                     }))
                 }
 

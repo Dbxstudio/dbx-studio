@@ -3,7 +3,7 @@ import Editor, { OnMount, OnChange, Monaco } from '@monaco-editor/react'
 import { FaPlay, FaStop, FaSave, FaDatabase, FaChevronDown, FaTable } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSqlite, SiMariadb, SiSnowflake, SiClickhouse, SiSupabase } from 'react-icons/si'
+import { SiSqlite, SiMariadb, SiSnowflake, SiClickhouse, SiSupabase, SiAmazonredshift } from 'react-icons/si'
 import { BsStars } from 'react-icons/bs'
 import { TbSchema } from 'react-icons/tb'
 import './sql-editor.css'
@@ -66,6 +66,8 @@ const getDatabaseIcon = (dialect: string, size = 14) => {
         return <SiClickhouse size={size} className="db-icon clickhouse" />
     } else if (dialectLower === 'supabase') {
         return <SiSupabase size={size} className="db-icon supabase" />
+    } else if (dialectLower === 'redshift') {
+        return <SiAmazonredshift size={size} className="db-icon redshift" />
     }
 
     return <FaDatabase size={size} className="db-icon default" />

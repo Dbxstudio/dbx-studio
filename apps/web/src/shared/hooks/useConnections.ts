@@ -8,7 +8,7 @@ import { MAIN_SERVER_ENDPOINT } from '../constants/serverConfig'
 export interface Connection {
     id: string
     name: string
-    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake' | 'supabase'
+    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake' | 'supabase' | 'redshift' | 'sqlite'
     userId?: string
     host?: string
     port?: number
@@ -122,6 +122,14 @@ export function useCreateConnection() {
                     } else {
                         connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
                     }
+                } else if (input.type === 'redshift') {
+                    driver = 'redshift'
+                    connectionString = `redshift+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+                } else if (input.type === 'sqlite') {
+                    driver = 'sqlite'
+                    // For SQLite, the database field contains the path
+                    // Use 3 slashes for absolute path
+                    connectionString = `sqlite+aiosqlite:///${database}`
                 } else {
                     connectionString = `${driver}://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
                 }

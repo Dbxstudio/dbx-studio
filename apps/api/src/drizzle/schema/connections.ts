@@ -3,7 +3,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { nanoid } from 'nanoid'
 
 // Database type enum values
-export const databaseTypes = ['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase'] as const
+export const databaseTypes = ['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite'] as const
 export type DatabaseType = typeof databaseTypes[number]
 
 // Base ID generator

@@ -3,6 +3,8 @@ import { ConnectionTypeSelector, type ConnectionType } from './ConnectionTypeSel
 import { PostgresConnectionModal } from './PostgresConnectionModal'
 import { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
 import { SupabaseConnectionModal } from './SupabaseConnectionModal'
+import { RedshiftConnectionModal } from './RedshiftConnectionModal'
+import { SqliteConnectionModal } from './SqliteConnectionModal'
 import type { CreateConnectionInput } from '../../../shared/hooks'
 import './connection-modal.css'
 
@@ -119,6 +121,32 @@ export function ConnectionModal({
                 />
             )
 
+        case 'redshift':
+            return (
+                <RedshiftConnectionModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onBack={handleBack}
+                    onSaveSuccess={onSaveSuccess}
+                    userId={userId}
+                    isEditing={isEditing}
+                    existingConnection={existingConnection}
+                />
+            )
+
+        case 'sqlite':
+            return (
+                <SqliteConnectionModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onBack={handleBack}
+                    onSaveSuccess={onSaveSuccess}
+                    userId={userId}
+                    isEditing={isEditing}
+                    existingConnection={existingConnection}
+                />
+            )
+
         // For unsupported types, fall back to type selector
         default:
             return (
@@ -136,3 +164,5 @@ export { ConnectionTypeSelector } from './ConnectionTypeSelector'
 export { PostgresConnectionModal } from './PostgresConnectionModal'
 export { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
 export { SupabaseConnectionModal } from './SupabaseConnectionModal'
+export { RedshiftConnectionModal } from './RedshiftConnectionModal'
+export { SqliteConnectionModal } from './SqliteConnectionModal'

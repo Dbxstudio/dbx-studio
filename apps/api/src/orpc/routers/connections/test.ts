@@ -15,12 +15,16 @@ import {
     createTempSnowflakeConnection,
     createSupabaseConnection,
     createTempSupabaseConnection,
+    createRedshiftConnection,
+    createTempRedshiftConnection,
+    createSqliteConnection,
+    createTempSqliteConnection,
 } from '~/kysely/connections'
 
 const testConnectionSchema = z.object({
     id: z.string().optional(),
     // Allow testing with connection details directly
-    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase']).optional(),
+    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite']).optional(),
     host: z.string().optional(),
     port: z.number().optional(),
     database: z.string().optional(),
@@ -58,7 +62,7 @@ export const test = orpc
                 })
             }
 
-            connectionConfig = connection
+            connectionConfig = connection as any
         } else if (input.type) {
             connectionConfig = input
         } else {
@@ -149,6 +153,36 @@ export const test = orpc
                             await sql`SELECT 1 as test`.execute(kysely)
                         } finally {
                             await pool.end()
+                        }
+                    }
+                    break
+                }
+
+                case 'redshift': {
+                    if (isExistingConnection) {
+                        const kysely = createRedshiftConnection(connectionConfig as any)
+                        await sql`SELECT 1 as test`.execute(kysely)
+                    } else {
+                        const { kysely, pool } = createTempRedshiftConnection(connectionConfig)
+                        try {
+                            await sql`SELECT 1 as test`.execute(kysely)
+                        } finally {
+                            await pool.end()
+                        }
+                    }
+                    break
+                }
+
+                case 'sqlite': {
+                    if (isExistingConnection) {
+                        const kysely = createSqliteConnection(connectionConfig as any)
+                        await sql`SELECT 1 as test`.execute(kysely)
+                    } else {
+                        const { kysely, db: sqliteDb } = createTempSqliteConnection(connectionConfig)
+                        try {
+                            await sql`SELECT 1 as test`.execute(kysely)
+                        } finally {
+                            sqliteDb.close()
                         }
                     }
                     break

@@ -168,6 +168,10 @@
     color: #3ECF8E;
 }
 
+.connection-type-icon.redshift {
+    color: #FF9900;
+}
+
 .connection-type-icon.mariadb {
     color: #C0765A;
 }
@@ -175,6 +179,10 @@
 /* PostgreSQL icon in modal header */
 .postgres {
     color: #5D9CEC;
+}
+
+.redshift {
+    color: #FF9900;
 }
 
 .connection-type-icon-wrapper {

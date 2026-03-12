@@ -9,6 +9,8 @@ import {
     createSnowflakeConnection,
     executeSnowflakeQuery,
     createSupabaseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -252,12 +254,7 @@ export const columns = orpc
                         },
                         format: 'JSONEachRow',
                     })
-                    const rows = await result.json<{
-                        name: string
-                        type: string
-                        default_expression: string
-                        is_in_primary_key: number
-                    }[]>()
+                    const rows = await result.json() as any[]
 
                     return rows.map(row => ({
                         name: row.name,
@@ -376,6 +373,129 @@ export const columns = orpc
                         foreignSchema: row.foreign_schema,
                         foreignTable: row.foreign_table,
                         foreignColumn: row.foreign_column,
+                    }))
+                }
+
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const result = await sql<{
+                        column_name: string
+                        data_type: string
+                        is_nullable: string
+                        column_default: string | null
+                        is_primary: boolean
+                        is_unique: boolean
+                        is_foreign: boolean
+                        foreign_schema: string | null
+                        foreign_table: string | null
+                        foreign_column: string | null
+                    }>`
+                        SELECT 
+                            c.column_name,
+                            c.data_type,
+                            c.is_nullable,
+                            c.column_default,
+                            EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints tc
+                                JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+                                WHERE c.table_schema = tc.constraint_schema
+                                    AND tc.table_name = c.table_name 
+                                    AND ccu.column_name = c.column_name
+                                    AND tc.constraint_type = 'PRIMARY KEY'
+                            ) as "is_primary",
+                            EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints tc
+                                JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+                                WHERE c.table_schema = tc.constraint_schema
+                                    AND tc.table_name = c.table_name 
+                                    AND ccu.column_name = c.column_name
+                                    AND tc.constraint_type = 'UNIQUE'
+                            ) as "is_unique",
+                            fk.constraint_name IS NOT NULL as "is_foreign",
+                            fk.foreign_schema,
+                            fk.foreign_table,
+                            fk.foreign_column
+                        FROM information_schema.columns c
+                        LEFT JOIN (
+                            SELECT 
+                                kcu.column_name,
+                                tc.constraint_name,
+                                ccu.table_schema as foreign_schema,
+                                ccu.table_name as foreign_table,
+                                ccu.column_name as foreign_column
+                            FROM information_schema.table_constraints tc
+                            JOIN information_schema.key_column_usage kcu 
+                                ON tc.constraint_name = kcu.constraint_name
+                                AND tc.table_schema = kcu.table_schema
+                            JOIN information_schema.constraint_column_usage ccu 
+                                ON tc.constraint_name = ccu.constraint_name
+                                AND tc.table_schema = ccu.constraint_schema
+                            WHERE tc.table_schema = ${input.schema}
+                                AND tc.table_name = ${input.tableName}
+                                AND tc.constraint_type = 'FOREIGN KEY'
+                        ) fk ON c.column_name = fk.column_name
+                        WHERE c.table_schema = ${input.schema}
+                            AND c.table_name = ${input.tableName}
+                        ORDER BY c.ordinal_position
+                    `.execute(kysely)
+
+                    return result.rows.map(row => ({
+                        name: row.column_name,
+                        type: row.data_type,
+                        nullable: row.is_nullable === 'YES',
+                        defaultValue: row.column_default,
+                        isPrimaryKey: row.is_primary,
+                        isUnique: row.is_unique,
+                        isForeignKey: row.is_foreign,
+                        foreignSchema: row.foreign_schema,
+                        foreignTable: row.foreign_table,
+                        foreignColumn: row.foreign_column,
+                    }))
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+
+                    // First get basic column info
+                    const tableInfoResult = await sql<{
+                        cid: number
+                        name: string
+                        type: string
+                        notnull: number
+                        dflt_value: string | null
+                        pk: number
+                    }>`PRAGMA table_info(${sql.raw('"' + input.tableName.replace(/"/g, '""') + '"')})`.execute(kysely)
+
+                    // Extract foreign keys
+                    const fkResult = await sql<{
+                        from: string
+                        table: string
+                        to: string
+                    }>`PRAGMA foreign_key_list(${sql.raw('"' + input.tableName.replace(/"/g, '""') + '"')})`.execute(kysely)
+
+                    const foreignKeys = fkResult.rows.reduce((acc, row) => {
+                        acc[row.from] = {
+                            table: row.table,
+                            column: row.to
+                        }
+                        return acc
+                    }, {} as Record<string, { table: string, column: string }>)
+
+                    // Note: SQLite unique constraints are harder to parse directly from PRAGMA, 
+                    // PRAGMA index_list combined with PRAGMA index_info is needed, but for simplicity
+                    // we'll default isUnique to false.
+
+                    return tableInfoResult.rows.map(row => ({
+                        name: row.name,
+                        type: row.type || 'TEXT',
+                        nullable: row.notnull === 0,
+                        defaultValue: row.dflt_value,
+                        isPrimaryKey: row.pk > 0,
+                        isUnique: false,
+                        isForeignKey: !!foreignKeys[row.name],
+                        foreignSchema: null,
+                        foreignTable: foreignKeys[row.name]?.table || null,
+                        foreignColumn: foreignKeys[row.name]?.column || null,
                     }))
                 }
 

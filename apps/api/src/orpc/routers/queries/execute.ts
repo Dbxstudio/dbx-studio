@@ -9,6 +9,8 @@ import {
     createSnowflakeConnection,
     executeSnowflakeQuery,
     createSupabaseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -81,6 +83,20 @@ export const execute = orpc
 
                 case 'supabase': {
                     const kysely = createSupabaseConnection(connection)
+                    const result = await sql.raw(input.sql).execute(kysely)
+                    rows = result.rows as unknown[]
+                    break
+                }
+
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const result = await sql.raw(input.sql).execute(kysely)
+                    rows = result.rows as unknown[]
+                    break
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
                     const result = await sql.raw(input.sql).execute(kysely)
                     rows = result.rows as unknown[]
                     break

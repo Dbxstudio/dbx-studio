@@ -7,7 +7,7 @@ import { closeConnection } from '~/kysely/connections'
 const updateConnectionSchema = z.object({
     id: z.string(),
     name: z.string().min(1).optional(),
-    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase']).optional(),
+    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite']).optional(),
     host: z.string().optional(),
     port: z.number().optional(),
     database: z.string().optional(),

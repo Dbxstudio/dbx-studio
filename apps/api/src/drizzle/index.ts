@@ -13,7 +13,14 @@ export * from './schema/ai-tables'
 
 // Lazy PGlite instance - only created when needed
 let pgliteInstance: PGlite | null = null
-let dbInstance: ReturnType<typeof drizzle> | null = null
+const schema = {
+    ...connections,
+    ...queries,
+    ...settings,
+    ...aiTables,
+}
+type Database = ReturnType<typeof drizzle<typeof schema>>
+let dbInstance: Database | null = null
 let isInitialized = false
 
 // Get or create PGlite instance
@@ -30,12 +37,7 @@ export async function getDb() {
     if (!dbInstance) {
         const pglite = await getPGlite()
         dbInstance = drizzle(pglite, {
-            schema: {
-                ...connections,
-                ...queries,
-                ...settings,
-                ...aiTables,
-            },
+            schema,
             logger: process.env.NODE_ENV === 'development',
         })
     }
@@ -44,7 +46,7 @@ export async function getDb() {
 
 // Legacy export - will be initialized on first access
 // NOTE: This is a lazy promise, use await getDb() for proper initialization
-export let db: ReturnType<typeof drizzle>
+export let db: Database
 
 
 // Initialize database (create tables if they don't exist)

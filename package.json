@@ -19,6 +19,11 @@
     "turbo": "^2.7.2",
     "prettier": "^3.4.2"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  },
   "packageManager": "pnpm@10.26.2",
   "engines": {
     "node": ">=20.0.0"
