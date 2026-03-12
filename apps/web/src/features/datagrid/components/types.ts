@@ -104,6 +104,7 @@ export interface DataGridProps {
     onRefresh?: () => void
     onExportCSV?: () => void
     onCellEdit?: (rowIndex: number, columnId: string, value: unknown) => Promise<void>
+    onRowInsert?: (row: Record<string, unknown>) => Promise<Record<string, unknown> | void>
     onRowDelete?: (rows: Record<string, unknown>[]) => Promise<void>
     onForeignKeyNavigate?: (table: string, schema: string, column: string, value: unknown) => void
     // Navigation (for FK drill-down)
