@@ -10,7 +10,7 @@ import { DataGrid } from './features/datagrid'
 import { AIChat } from './features/ai'
 import { SettingsPage } from './features/settings'
 import { AuthProvider, useAuth, Login } from './features/auth'
-import { useConnections, useTables, useTableColumns, useInfiniteTableData, useExecuteQuery, useSchemas, useUpdateRow, useDeleteRow, useDeleteConnection } from './shared/hooks'
+import { useConnections, useTables, useTableColumns, useInfiniteTableData, useExecuteQuery, useSchemas, useInsertRow, useUpdateRow, useDeleteRow, useDeleteConnection } from './shared/hooks'
 import {
     getCachedOpenTabs,
     setCachedOpenTabs,
@@ -155,6 +155,10 @@ function AppContent() {
 
     // Query client for cache management
     const queryClient = useQueryClient()
+
+    // Rows inserted by the user in the current tab — persisted across server refetches
+    // so newly added rows stay visible at the top until the user navigates away.
+    const [pinnedInsertedRows, setPinnedInsertedRows] = useState<Record<string, unknown>[]>([])
 
     // State
     const [currentView, setCurrentView] = useState<ViewType>('collections')
@@ -306,9 +310,30 @@ function AppContent() {
         { pageSize: 50, filters: serverFilters }
     )
 
+    // Clear pinned rows when the active tab changes
+    useEffect(() => {
+        setPinnedInsertedRows([])
+    }, [activeTabId])
+
     // Flatten all pages into a single array of rows
-    const tableDataRows = tableDataPages?.pages?.flatMap(page => page.rows) || []
-    const tableTotalCount = tableDataPages?.pages?.[0]?.total || 0
+    const tableDataRows = useMemo(() => {
+        const serverRows = tableDataPages?.pages?.flatMap(page => page.rows) || []
+        if (pinnedInsertedRows.length === 0) return serverRows
+
+        // Deduplicate: remove pinned rows that the server already returned (matched by PK)
+        const pkCols = tableColumnsData?.filter(c => c.isPrimaryKey).map(c => c.name) || []
+        const uniquePinned = pkCols.length > 0
+            ? pinnedInsertedRows.filter(pinned =>
+                !serverRows.some(serverRow =>
+                    pkCols.every(pk => String(serverRow[pk]) === String(pinned[pk]))
+                )
+              )
+            : pinnedInsertedRows
+
+        return [...uniquePinned, ...serverRows]
+    }, [tableDataPages, pinnedInsertedRows, tableColumnsData])
+
+    const tableTotalCount = (tableDataPages?.pages?.[0]?.total ?? 0) + pinnedInsertedRows.length
 
     // Combine errors for display
     const tableError = useMemo(() => {
@@ -560,6 +585,7 @@ function AppContent() {
     const { mutateAsync: executeQuery } = useExecuteQuery()
 
     // Table mutation hooks
+    const { mutateAsync: insertRowMutation } = useInsertRow()
     const { mutateAsync: updateRowMutation } = useUpdateRow()
     const { mutateAsync: deleteRowMutation } = useDeleteRow()
 
@@ -652,6 +678,32 @@ function AppContent() {
             throw new Error(errorMessage)
         }
     }, [activeTab, tableDataRows, tableColumnsData, updateRowMutation, refetchTableData])
+
+    // Handle new row insert for table data
+    const handleRowInsert = useCallback(async (row: Record<string, unknown>) => {
+        if (!activeTab || activeTab.type !== 'table') return
+
+        const connectionId = activeTab.connectionId || ''
+        const tableName = activeTab.tableName || ''
+        const schema = activeTab.schema || 'public'
+
+        try {
+            const result = await insertRowMutation({ connectionId, tableName, schema, data: row })
+            const insertedRow: Record<string, unknown> =
+                (result as any)?.data ?? (result as any)?.json?.data ?? row
+
+            // Pin the row so it stays at the top regardless of future server refetches.
+            // It will be deduplicated automatically once a refetch returns it on page 1.
+            setPinnedInsertedRows(prev => [insertedRow, ...prev])
+
+            toast.success('Row added successfully')
+            return insertedRow
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to insert row'
+            toast.error(errorMessage)
+            throw new Error(errorMessage)
+        }
+    }, [activeTab, insertRowMutation])
 
     // Handle row delete for table data
     const handleRowDelete = useCallback(async (rows: Record<string, unknown>[]) => {
@@ -947,6 +999,7 @@ function AppContent() {
                                                     refetchTableData()
                                                 }}
                                                 onCellEdit={handleCellEdit}
+                                                onRowInsert={handleRowInsert}
                                                 onRowDelete={handleRowDelete}
                                                 onForeignKeyNavigate={handleForeignKeyNavigate}
                                                 canNavigateBack={!!activeTab.history?.length}

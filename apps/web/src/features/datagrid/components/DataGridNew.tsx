@@ -826,6 +826,7 @@ export function DataGridNew({
     onFilterChange,
     onSortChange,
     onCellEdit,
+    onRowInsert,
     onRowDelete,
     onForeignKeyNavigate,
     canNavigateBack = false,
@@ -853,6 +854,9 @@ export function DataGridNew({
     const [newRowEditing, setNewRowEditing] = useState<string | null>(null)
     const [newRowEditValue, setNewRowEditValue] = useState('')
 
+    // Tracks which row index to flash green after insertion
+    const [highlightedRowIndex, setHighlightedRowIndex] = useState<number | null>(null)
+
     // Panel states
     const [showFilterPanel, setShowFilterPanel] = useState(false)
     const [showColumnsPanel, setShowColumnsPanel] = useState(false)
@@ -860,6 +864,7 @@ export function DataGridNew({
 
     const containerRef = useRef<HTMLDivElement>(null)
     const tableBodyRef = useRef<HTMLTableSectionElement>(null)
+    const gridTableContainerRef = useRef<HTMLDivElement>(null)
 
     // Visible columns
     const visibleColumns = useMemo(() =>
@@ -1152,15 +1157,25 @@ export function DataGridNew({
         }
 
         try {
-            // For now, just log the row to insert since onRowInsert is not available
-            console.log('Would insert row:', rowToInsert)
-            setNewRow(null)
-            setNewRowEditing(null)
-            onRefresh?.()
+            if (onRowInsert) {
+                await onRowInsert(rowToInsert)
+                // Row is prepended at position 0 in the cache — scroll to top and flash it
+                setNewRow(null)
+                setNewRowEditing(null)
+                setHighlightedRowIndex(0)
+                const container = gridTableContainerRef.current
+                if (container) {
+                    container.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+                setTimeout(() => setHighlightedRowIndex(null), 2500)
+            } else {
+                setNewRow(null)
+                setNewRowEditing(null)
+            }
         } catch (error) {
             console.error('Failed to add row:', error)
         }
-    }, [columns, newRow, onRefresh])
+    }, [columns, newRow, onRowInsert])
 
     // Cancel adding new row
     const handleCancelNewRow = useCallback(() => {
@@ -1522,6 +1537,7 @@ export function DataGridNew({
 
             {/* Table Container */}
             <div
+                ref={gridTableContainerRef}
                 className="grid-table-container"
                 onScroll={handleScroll}
             >
@@ -1624,7 +1640,7 @@ export function DataGridNew({
                         {filteredData.map((row, rowIndex) => (
                             <tr
                                 key={rowIndex}
-                                className={`grid-row ${selectedRows.has(rowIndex) ? 'selected' : ''}`}
+                                className={`grid-row ${selectedRows.has(rowIndex) ? 'selected' : ''} ${highlightedRowIndex === rowIndex ? 'inserted-row-highlight' : ''}`}
                             >
                                 {/* Selection checkbox */}
                                 {primaryKeys.length > 0 && (

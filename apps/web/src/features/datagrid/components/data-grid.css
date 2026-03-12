@@ -498,6 +498,16 @@
     background: rgba(79, 195, 247, 0.15);
 }
 
+@keyframes insertedRowFlash {
+    0%   { background: rgba(72, 199, 116, 0.45); }
+    60%  { background: rgba(72, 199, 116, 0.25); }
+    100% { background: transparent; }
+}
+
+.grid-row.inserted-row-highlight {
+    animation: insertedRowFlash 2.5s ease-out forwards;
+}
+
 .grid-cell {
     padding: 0 12px;
     border-right: 1px solid var(--grid-border-primary);
