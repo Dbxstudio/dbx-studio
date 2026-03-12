@@ -4,7 +4,7 @@
 
 
 
-[![Discord](https://img.shields.io/badge/DISCORD-JOIN%20COMMUNITY-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/jSU9dAqf)
+[![Discord](https://img.shields.io/badge/DISCORD-JOIN%20COMMUNITY-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kuhuKcJJbk)
 
 </div>
 
