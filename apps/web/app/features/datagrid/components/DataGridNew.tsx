@@ -144,6 +144,8 @@ interface ToolbarProps {
     isSaving?: boolean
     onSaveChanges?: () => void
     onCancelChanges?: () => void
+    // Properties
+    onShowProperties?: () => void
 }
 
 function Toolbar({
@@ -172,6 +174,7 @@ function Toolbar({
     isSaving = false,
     onSaveChanges,
     onCancelChanges,
+    onShowProperties,
 }: ToolbarProps) {
     return (
         <div className="grid-toolbar">
@@ -202,6 +205,17 @@ function Toolbar({
                             <span>{rowCount} rows</span>
                         )}
                     </div>
+                )}
+                {/* Properties button */}
+                {onShowProperties && (
+                    <button
+                        className="toolbar-properties-btn"
+                        onClick={onShowProperties}
+                        title="Table Properties"
+                    >
+                        <FaDatabase size={11} />
+                        <span>Properties</span>
+                    </button>
                 )}
                 {selectedCount > 0 && (
                     <div className="selection-info">
@@ -814,6 +828,7 @@ export function DataGridNew({
     onForeignKeyNavigate,
     canNavigateBack = false,
     onNavigateBack,
+    onShowProperties,
 }: DataGridProps) {
     // State
     const [columnSizing, setColumnSizing] = useState<Record<string, number>>({})
@@ -1200,6 +1215,7 @@ export function DataGridNew({
                     onOpenSort={() => setShowSortPanel(true)}
                     canNavigateBack={canNavigateBack}
                     onNavigateBack={onNavigateBack}
+                    onShowProperties={onShowProperties}
                 />
 
                 {/* Show table with headers but no data */}
@@ -1289,6 +1305,7 @@ export function DataGridNew({
                 isSaving={isSaving}
                 onSaveChanges={handleSaveChanges}
                 onCancelChanges={handleCancelChanges}
+                onShowProperties={onShowProperties}
             />
 
             {/* Active Filters */}

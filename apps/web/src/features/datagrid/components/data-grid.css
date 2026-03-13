@@ -824,6 +824,29 @@
     border-color: #4fc3f7;
 }
 
+/* Properties button */
+.toolbar-properties-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: var(--grid-bg-primary);
+    border: 1px solid var(--grid-border-secondary);
+    color: var(--grid-text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.toolbar-properties-btn:hover {
+    background: var(--grid-bg-tertiary);
+    border-color: var(--grid-accent);
+    color: var(--grid-accent);
+}
+
 /* ============================================
    FOREIGN KEY CELL
    ============================================ */

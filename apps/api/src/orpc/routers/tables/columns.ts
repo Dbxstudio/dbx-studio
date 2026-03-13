@@ -31,6 +31,7 @@ interface ColumnInfo {
     foreignSchema: string | null
     foreignTable: string | null
     foreignColumn: string | null
+    indexName: string | null
 }
 
 /**
@@ -64,6 +65,7 @@ export const columns = orpc
                         foreign_schema: string | null
                         foreign_table: string | null
                         foreign_column: string | null
+                        index_name: string | null
                     }>`
                         SELECT 
                             c.column_name,
@@ -75,7 +77,8 @@ export const columns = orpc
                             CASE WHEN fk.column_name IS NOT NULL THEN true ELSE false END as is_foreign,
                             fk.foreign_schema,
                             fk.foreign_table,
-                            fk.foreign_column
+                            fk.foreign_column,
+                            col_idx.index_name
                         FROM information_schema.columns c
                         LEFT JOIN (
                             SELECT kcu.column_name
@@ -114,6 +117,19 @@ export const columns = orpc
                                 AND tc.table_name = ${input.tableName}
                                 AND tc.constraint_type = 'FOREIGN KEY'
                         ) fk ON c.column_name = fk.column_name
+                        LEFT JOIN (
+                            SELECT DISTINCT ON (a.attname)
+                                a.attname AS col_name,
+                                i.relname AS index_name
+                            FROM pg_class t
+                            JOIN pg_namespace n ON n.oid = t.relnamespace
+                            JOIN pg_index ix ON t.oid = ix.indrelid
+                            JOIN pg_class i ON i.oid = ix.indexrelid
+                            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+                            WHERE n.nspname = ${input.schema}
+                              AND t.relname = ${input.tableName}
+                            ORDER BY a.attname, i.relname
+                        ) col_idx ON c.column_name = col_idx.col_name
                         WHERE c.table_schema = ${input.schema}
                             AND c.table_name = ${input.tableName}
                         ORDER BY c.ordinal_position
@@ -130,6 +146,7 @@ export const columns = orpc
                         foreignSchema: row.foreign_schema,
                         foreignTable: row.foreign_table,
                         foreignColumn: row.foreign_column,
+                        indexName: row.index_name,
                     }))
                 }
 
@@ -177,6 +194,7 @@ export const columns = orpc
                         foreignSchema: row.REFERENCED_TABLE_SCHEMA,
                         foreignTable: row.REFERENCED_TABLE_NAME,
                         foreignColumn: row.REFERENCED_COLUMN_NAME,
+                        indexName: null,
                     }))
                 }
 
@@ -235,6 +253,7 @@ export const columns = orpc
                         foreignSchema: row.FOREIGN_SCHEMA,
                         foreignTable: row.FOREIGN_TABLE,
                         foreignColumn: row.FOREIGN_COLUMN,
+                        indexName: null,
                     }))
                 }
 
@@ -267,6 +286,7 @@ export const columns = orpc
                         foreignSchema: null,
                         foreignTable: null,
                         foreignColumn: null,
+                        indexName: null,
                     }))
                 }
 
@@ -290,6 +310,7 @@ export const columns = orpc
                         foreignSchema: null,
                         foreignTable: null,
                         foreignColumn: null,
+                        indexName: null,
                     }))
                 }
 
@@ -373,6 +394,7 @@ export const columns = orpc
                         foreignSchema: row.foreign_schema,
                         foreignTable: row.foreign_table,
                         foreignColumn: row.foreign_column,
+                        indexName: null,
                     }))
                 }
 
@@ -450,6 +472,7 @@ export const columns = orpc
                         foreignSchema: row.foreign_schema,
                         foreignTable: row.foreign_table,
                         foreignColumn: row.foreign_column,
+                        indexName: null,
                     }))
                 }
 
@@ -496,6 +519,7 @@ export const columns = orpc
                         foreignSchema: null,
                         foreignTable: foreignKeys[row.name]?.table || null,
                         foreignColumn: foreignKeys[row.name]?.column || null,
+                        indexName: null,
                     }))
                 }
 

@@ -146,6 +146,8 @@ interface ToolbarProps {
     isSaving?: boolean
     onSaveChanges?: () => void
     onCancelChanges?: () => void
+    // Properties
+    onShowProperties?: () => void
 }
 
 function Toolbar({
@@ -176,6 +178,7 @@ function Toolbar({
     isSaving = false,
     onSaveChanges,
     onCancelChanges,
+    onShowProperties,
 }: ToolbarProps) {
     return (
         <div className="grid-toolbar">
@@ -338,6 +341,19 @@ function Toolbar({
                 >
                     <FaFileExport size={14} />
                 </button>
+
+                {onShowProperties && (
+                    <>
+                        <div className="toolbar-divider" />
+                        <button
+                            className="toolbar-properties-btn"
+                            onClick={onShowProperties}
+                            title="Table Properties"
+                        >
+                            Properties
+                        </button>
+                    </>
+                )}
 
                 <button
                     className="toolbar-icon-btn"
@@ -833,6 +849,7 @@ export function DataGridNew({
     onNavigateBack,
     onSaveSuccess,
     onSaveError,
+    onShowProperties,
 }: DataGridProps) {
     // State
     const [columnSizing, setColumnSizing] = useState<Record<string, number>>({})
@@ -1526,6 +1543,7 @@ export function DataGridNew({
                 isSaving={isSaving}
                 onSaveChanges={handleSaveChanges}
                 onCancelChanges={handleCancelChanges}
+                onShowProperties={onShowProperties}
             />
 
             {/* Active Filters */}

@@ -116,6 +116,8 @@ export interface DataGridProps {
     // Save callbacks for user feedback
     onSaveSuccess?: (changeCount: number) => void
     onSaveError?: (error: Error) => void
+    // Properties panel
+    onShowProperties?: () => void
 }
 
 // Filter definitions
