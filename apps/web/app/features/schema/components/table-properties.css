@@ -1,0 +1,388 @@
+/* ============================================================
+   Table Properties Panel
+   ============================================================ */
+
+.table-properties {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: #1f1f1f;
+    color: #e1e1e1;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+}
+
+/* ---- Header ---- */
+.tp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 16px;
+    background: #181818;
+    border-bottom: 1px solid #2d2d2d;
+    min-height: 38px;
+    flex-shrink: 0;
+}
+
+.tp-header-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.tp-icon {
+    width: 15px;
+    height: 15px;
+    color: #888;
+    flex-shrink: 0;
+}
+
+.tp-icon-sm {
+    width: 13px;
+    height: 13px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.tp-table-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #fff;
+}
+
+.tp-schema-badge {
+    font-size: 11px;
+    color: #999;
+    background: #2a2a2a;
+    border: 1px solid #383838;
+    padding: 1px 8px;
+    border-radius: 10px;
+}
+
+.tp-header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 12px;
+    color: #777;
+}
+
+.tp-db-name,
+.tp-date {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ---- Toolbar ---- */
+.tp-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 16px;
+    border-bottom: 1px solid #2d2d2d;
+    min-height: 34px;
+    flex-shrink: 0;
+    background: #1f1f1f;
+    gap: 8px;
+}
+
+.tp-toolbar-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #bbb;
+    letter-spacing: 0.03em;
+    flex: 1;
+}
+
+.tp-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #2a2a2a;
+    border: 1px solid #3d3d3d;
+    color: #ccc;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    line-height: 1;
+}
+
+.tp-back-btn:hover {
+    background: #333;
+    border-color: #555;
+    color: #fff;
+}
+
+.tp-refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #2a2a2a;
+    border: 1px solid #3d3d3d;
+    color: #ccc;
+    padding: 4px 11px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    line-height: 1;
+}
+
+.tp-refresh-btn:hover {
+    background: #333;
+    border-color: #555;
+    color: #fff;
+}
+
+/* ---- Body: sidebar + content ---- */
+.tp-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ---- Sidebar ---- */
+.tp-sidebar {
+    width: 158px;
+    flex-shrink: 0;
+    border-right: 1px solid #2d2d2d;
+    background: #181818;
+    overflow-y: auto;
+    padding: 6px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.tp-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    color: #999;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-left: 3px solid transparent;
+    text-align: left;
+    width: 100%;
+    transition: background 0.1s, color 0.1s;
+}
+
+.tp-nav-item:hover {
+    background: #222;
+    color: #ddd;
+}
+
+.tp-nav-item.active {
+    color: #fff;
+    border-left-color: #4a9eff;
+    background: #1a2840;
+}
+
+.tp-nav-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.tp-nav-item.active .tp-nav-icon {
+    opacity: 1;
+}
+
+/* ---- Content area ---- */
+.tp-content {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+}
+
+.tp-empty-state {
+    padding: 40px 24px;
+    text-align: center;
+    color: #555;
+    font-size: 13px;
+}
+
+/* ---- Properties Table ---- */
+.tp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+.tp-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #181818;
+}
+
+.tp-table th {
+    text-align: left;
+    padding: 8px 13px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #777;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid #2d2d2d;
+    white-space: nowrap;
+}
+
+.tp-th-num {
+    width: 36px;
+    text-align: center;
+}
+
+.tp-table tbody tr {
+    border-bottom: 1px solid #272727;
+    transition: background 0.08s;
+}
+
+.tp-table tbody tr:hover {
+    background: #262626;
+}
+
+.tp-table td {
+    padding: 7px 13px;
+    color: #d5d5d5;
+    vertical-align: middle;
+}
+
+.tp-td-num {
+    text-align: center;
+    color: #666;
+    font-size: 11.5px;
+    width: 36px;
+}
+
+/* Column name cell */
+.tp-col-name {
+    font-weight: 500;
+    color: #e8e8e8;
+}
+
+.tp-badge-icon {
+    width: 13px;
+    height: 13px;
+    margin-left: 5px;
+    vertical-align: middle;
+    display: inline-block;
+}
+
+.tp-pk { color: #f0c040; }
+.tp-fk { color: #60b8f0; }
+
+/* Data type */
+.tp-td-type {
+    color: #9ab8d8;
+    font-size: 12px;
+}
+
+/* Nullable checkbox */
+.tp-td-nullable {
+    text-align: center;
+}
+
+.tp-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.tp-check-yes {
+    background: #1e4d27;
+    border: 1px solid #2e7039;
+    color: #6edb7e;
+}
+
+.tp-check-no {
+    border: 1px solid #3d3d3d;
+    background: transparent;
+}
+
+/* Default value */
+.tp-td-default {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tp-default-val {
+    font-size: 12px;
+    color: #b0b0b0;
+}
+
+.tp-null-val {
+    font-size: 12px;
+    color: #555;
+    font-style: italic;
+}
+
+/* Key badge */
+.tp-td-key {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #999;
+}
+
+/* Extra */
+.tp-td-extra em {
+    font-size: 12px;
+    color: #888;
+}
+
+/* Index name */
+.tp-td-index {
+    font-size: 12px;
+    color: #aaa;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Empty row (no data) */
+.tp-empty-row {
+    text-align: center;
+    color: #555;
+    font-size: 12.5px;
+    font-style: italic;
+    padding: 24px !important;
+}
+
+/* ---- Footer ---- */
+.tp-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px;
+    border-top: 1px solid #2d2d2d;
+    background: #181818;
+    font-size: 12px;
+    color: #777;
+    flex-shrink: 0;
+}
+
+.tp-footer strong {
+    color: #bbb;
+    font-weight: 600;
+}
+
+.tp-sep {
+    color: #3d3d3d;
+}
