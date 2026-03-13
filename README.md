@@ -1,21 +1,21 @@
 <div align="center">
 
-<img src="apps/desktop/public/assets/dbx-logo-new.png" alt="DBX Studio Logo" width="200"/>
+<img src="apps/desktop/public/assets/dbx-logo-new.png" alt="dbx Studio Logo" width="200"/>
 
 
 
-[![Discord](https://img.shields.io/badge/DISCORD-JOIN%20COMMUNITY-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/jSU9dAqf)
+[![Discord](https://img.shields.io/badge/DISCORD-JOIN%20COMMUNITY-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kuhuKcJJbk)
 
 </div>
 
-# DBX Studio
-AI-powered open-source database management tool that simplifies database interactions with secure connection storage and AI-assisted SQL query writing.
+# dbx Studio
+Free AI-powered open-source database management tool that simplifies database interactions with secure connection storage and AI-assisted SQL query writing.
 
 ---
 
-## ✨ Try DBX Studio
+## ✨ Try dbx Studio
 
-[![Download DBX Studio](apps/web/public/assets/Whisk_bbc181a05014fcc973741ec56f489558dr%201.png)](https://www.dbxstudio.com/download)
+[![Download dbx Studio](apps/web/public/assets/Whisk_bbc181a05014fcc973741ec56f489558dr%201.png)](https://www.dbxstudio.com/download)
 
 
 ---
@@ -23,7 +23,7 @@ AI-powered open-source database management tool that simplifies database interac
 ## ✨ Features
 
 ### 🧠 Intelligent Query Generation
-Describe what you want in plain English — DBX generates optimized SQL queries instantly.
+Describe what you want in plain English — dbx generates optimized SQL queries instantly.
 
 ![AI SQL Chat](apps/web/public/assets/AI%20SQL%20Chat.png)
 
@@ -53,8 +53,6 @@ Browse tables, preview rows, filter results, and inspect relationships visually.
 - SQLite
 - Supabase
 - Amazon Redshift
-- MySQL
-- MSSQL
 - *More coming soon*
 
 ### 🔒 Secure by Design
@@ -224,7 +222,7 @@ The API uses PGLite (SQLite-compatible) for storing:
 
 ## AI Providers
 
-DBX Studio supports multiple AI providers:
+dbx Studio supports multiple AI providers:
 
 | Provider | Models | Configuration |
 |----------|--------|---------------|
