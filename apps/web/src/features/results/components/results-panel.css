@@ -161,6 +161,27 @@
     gap: 4px;
 }
 
+.results-error .fix-in-chat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #f3f4f6;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.results-error .fix-in-chat-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
 .results-error strong {
     font-size: 14px;
     font-weight: 600;

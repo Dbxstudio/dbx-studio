@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { FaTable, FaCode, FaCopy, FaFileExport, FaSpinner, FaExclamationTriangle, FaCheckCircle, FaTimes } from 'react-icons/fa'
+import { FaTable, FaCode, FaCopy, FaFileExport, FaSpinner, FaExclamationTriangle, FaCheckCircle, FaTimes, FaComments } from 'react-icons/fa'
 import { DataGrid } from '../../datagrid'
 import './results-panel.css'
 
@@ -17,6 +17,7 @@ interface ResultsPanelProps {
     onClose?: () => void
     onLoadMore?: () => void
     hasMore?: boolean
+    onFixInChat?: () => void
 }
 
 export function ResultsPanel({
@@ -28,6 +29,7 @@ export function ResultsPanel({
     onClose,
     onLoadMore,
     hasMore = false,
+    onFixInChat,
 }: ResultsPanelProps) {
     const [viewMode, setViewMode] = useState<'table' | 'json'>('table')
     const [copySuccess, setCopySuccess] = useState(false)
@@ -96,6 +98,12 @@ export function ResultsPanel({
                         <strong>Query Error</strong>
                         <span>{error}</span>
                     </div>
+                    {onFixInChat && (
+                        <button className="fix-in-chat-btn" onClick={onFixInChat}>
+                            <FaComments size={12} />
+                            <span>Fix in Chat</span>
+                        </button>
+                    )}
                     {onClose && (
                         <button className="close-btn" onClick={onClose}>
                             <FaTimes size={14} />
