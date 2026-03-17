@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { ConnectionTypeSelector, type ConnectionType } from './ConnectionTypeSelector'
 import { PostgresConnectionModal } from './PostgresConnectionModal'
+import { MysqlConnectionModal } from './MysqlConnectionModal'
 import { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
 import { SupabaseConnectionModal } from './SupabaseConnectionModal'
 import { RedshiftConnectionModal } from './RedshiftConnectionModal'
 import { SqliteConnectionModal } from './SqliteConnectionModal'
+import { MariadbConnectionModal } from './MariadbConnectionModal'
 import type { CreateConnectionInput } from '../../../shared/hooks'
 import './connection-modal.css'
 
@@ -95,6 +97,19 @@ export function ConnectionModal({
                 />
             )
 
+        case 'mysql':
+            return (
+                <MysqlConnectionModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onBack={handleBack}
+                    onSaveSuccess={onSaveSuccess}
+                    userId={userId}
+                    isEditing={isEditing}
+                    existingConnection={existingConnection}
+                />
+            )
+
         case 'snowflake':
             return (
                 <SnowflakeConnectionModal
@@ -162,6 +177,8 @@ export function ConnectionModal({
 // Export individual components for direct use if needed
 export { ConnectionTypeSelector } from './ConnectionTypeSelector'
 export { PostgresConnectionModal } from './PostgresConnectionModal'
+export { MysqlConnectionModal } from './MysqlConnectionModal'
+export { MariadbConnectionModal } from './MariadbConnectionModal'
 export { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
 export { SupabaseConnectionModal } from './SupabaseConnectionModal'
 export { RedshiftConnectionModal } from './RedshiftConnectionModal'

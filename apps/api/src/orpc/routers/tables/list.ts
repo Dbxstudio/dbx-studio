@@ -54,7 +54,9 @@ export const list = orpc
 
                 case 'mysql': {
                     const kysely = createMysqlConnection(connection)
-                    const database = connection.database || 'mysql'
+                    const database = input.schema === 'public'
+                        ? connection.database || 'mysql'
+                        : input.schema
                     const result = await sql<{ TABLE_NAME: string; TABLE_TYPE: string }>`
                         SELECT TABLE_NAME, TABLE_TYPE 
                         FROM information_schema.TABLES 

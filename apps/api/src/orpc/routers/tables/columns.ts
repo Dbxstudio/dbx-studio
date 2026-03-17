@@ -152,7 +152,9 @@ export const columns = orpc
 
                 case 'mysql': {
                     const kysely = createMysqlConnection(connection)
-                    const database = connection.database || 'mysql'
+                    const database = input.schema === 'public'
+                        ? connection.database || 'mysql'
+                        : input.schema
                     const result = await sql<{
                         COLUMN_NAME: string
                         DATA_TYPE: string

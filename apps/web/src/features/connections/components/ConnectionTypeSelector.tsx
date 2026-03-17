@@ -1,7 +1,7 @@
 import { FaTimes, FaDatabase } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSnowflake, SiSqlite, SiMariadb, SiSupabase, SiAmazonredshift } from 'react-icons/si'
+import { SiSnowflake, SiSqlite, SiSupabase, SiAmazonredshift } from 'react-icons/si'
 import './connection-modal.css'
 
 export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase' | 'redshift'
@@ -37,8 +37,7 @@ const connectionTypes: ConnectionTypeConfig[] = [
         type: 'mysql',
         name: 'MySQL',
         icon: <GrMysql size={40} className="connection-type-icon mysql" />,
-        description: 'Connect to MySQL database',
-        comingSoon: true
+        description: 'Connect to MySQL database'
     },
     {
         type: 'sqlite',

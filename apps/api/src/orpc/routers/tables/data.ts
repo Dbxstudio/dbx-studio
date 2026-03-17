@@ -130,7 +130,9 @@ export const data = orpc
 
                 case 'mysql': {
                     const kysely = createMysqlConnection(connection)
-                    const database = connection.database || 'mysql'
+                    const database = input.schema === 'public'
+                        ? connection.database || 'mysql'
+                        : input.schema
                     const fullTableName = `\`${database}\`.\`${input.tableName}\``
 
                     // Get total count
