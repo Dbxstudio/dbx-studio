@@ -5,7 +5,12 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createSupabaseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -125,7 +130,9 @@ export const data = orpc
 
                 case 'mysql': {
                     const kysely = createMysqlConnection(connection)
-                    const database = connection.database || 'mysql'
+                    const database = input.schema === 'public'
+                        ? connection.database || 'mysql'
+                        : input.schema
                     const fullTableName = `\`${database}\`.\`${input.tableName}\``
 
                     // Get total count
@@ -189,7 +196,7 @@ export const data = orpc
                         query: `SELECT COUNT(*) as count FROM ${connection.database || 'default'}.${input.tableName}`,
                         format: 'JSONEachRow',
                     })
-                    const countRows = await countResult.json<{ count: string }[]>()
+                    const countRows = await countResult.json() as any[]
                     const total = parseInt(countRows[0]?.count || '0', 10)
 
                     // Get data
@@ -209,6 +216,108 @@ export const data = orpc
 
                     return {
                         rows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'snowflake': {
+                    const conn = createSnowflakeConnection(connection)
+                    const database = connection.database || ''
+                    const schema = input.schema || 'PUBLIC'
+                    const fullTableName = database
+                        ? `"${database}"."${schema.toUpperCase()}"."${input.tableName.toUpperCase()}"`
+                        : `"${schema.toUpperCase()}"."${input.tableName.toUpperCase()}"`
+
+                    const countRows = await executeSnowflakeQuery(conn, `SELECT COUNT(*) as cnt FROM ${fullTableName}`) as any[]
+                    const total = parseInt(countRows[0]?.CNT || countRows[0]?.cnt || '0', 10)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY "${input.orderBy}" ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+                    const sfRows = await executeSnowflakeQuery(conn,
+                        `SELECT * FROM ${fullTableName} ${orderClause} LIMIT ${input.pageSize} OFFSET ${offset}`
+                    ) as unknown[]
+
+                    return {
+                        rows: sfRows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'supabase': {
+                    const kysely = createSupabaseConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
+                    const whereClause = buildPostgresWhereClause(input.filters)
+
+                    const countQuery = `SELECT COUNT(*) as count FROM ${fullTableName} ${whereClause}`
+                    const countResult = await sql<{ count: string }>`${sql.raw(countQuery)}`.execute(kysely)
+                    const total = parseInt(countResult.rows[0]?.count || '0', 10)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY "${input.orderBy}" ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+
+                    const dataQuery = `SELECT * FROM ${fullTableName} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`
+                    const dataResult = await sql`${sql.raw(dataQuery)}`.execute(kysely)
+
+                    return {
+                        rows: dataResult.rows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
+                    const whereClause = buildPostgresWhereClause(input.filters)
+
+                    const countQuery = `SELECT COUNT(*) as count FROM ${fullTableName} ${whereClause}`
+                    const countResult = await sql<{ count: string }>`${sql.raw(countQuery)}`.execute(kysely)
+                    const total = parseInt(countResult.rows[0]?.count || '0', 10)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY "${input.orderBy}" ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+
+                    const dataQuery = `SELECT * FROM ${fullTableName} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`
+                    const dataResult = await sql`${sql.raw(dataQuery)}`.execute(kysely)
+
+                    return {
+                        rows: dataResult.rows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+                    const fullTableName = `"${input.tableName}"`
+                    const whereClause = buildPostgresWhereClause(input.filters) // SQLite syntax is mostly compatible
+
+                    const countQuery = `SELECT COUNT(*) as count FROM ${fullTableName} ${whereClause}`
+                    const countResult = await sql<{ count: number }>`${sql.raw(countQuery)}`.execute(kysely)
+                    const total = Number(countResult.rows[0]?.count || 0)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY "${input.orderBy}" ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+
+                    const dataQuery = `SELECT * FROM ${fullTableName} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`
+                    const dataResult = await sql`${sql.raw(dataQuery)}`.execute(kysely)
+
+                    return {
+                        rows: dataResult.rows,
                         total,
                         page: input.page,
                         pageSize: input.pageSize,

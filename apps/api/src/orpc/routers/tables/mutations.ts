@@ -5,7 +5,9 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -159,33 +161,66 @@ export const updateRow = orpc
                     }
                 }
 
-                case 'clickhouse': {
-                    const client = createClickHouseConnection(connection)
+                case 'snowflake': {
+                    // Snowflake mutations would be similar to Postgres but with different quoting maybe
+                    // For now, let's keep it unimplemented or add basic support
+                    throw new ORPCError('NOT_IMPLEMENTED', {
+                        message: 'Row update not yet implemented for Snowflake',
+                    })
+                }
 
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
                     const formatValue = (val: unknown): string => {
                         if (val === null || val === undefined) return 'NULL'
-                        if (typeof val === 'string') return `'${val.replace(/'/g, "\\'")}'`
-                        if (val instanceof Date) return `'${val.toISOString()}'`
+                        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
+                        if (typeof val === 'number') return String(val)
                         return String(val)
                     }
 
-                    // Build SET clause
                     const setClause = dataEntries
-                        .map(([col, val]) => `${col} = ${formatValue(val)}`)
+                        .map(([col, val]) => `"${col}" = ${formatValue(val)}`)
                         .join(', ')
 
-                    // Build WHERE clause
                     const whereClause = pkEntries
-                        .map(([col, val]) => `${col} = ${formatValue(val)}`)
+                        .map(([col, val]) => `"${col}" = ${formatValue(val)}`)
                         .join(' AND ')
 
-                    await client.query({
-                        query: `
-                            ALTER TABLE ${connection.database || 'default'}.${input.tableName}
-                            UPDATE ${setClause}
-                            WHERE ${whereClause}
-                        `,
-                    })
+                    const result = await sql`
+                        UPDATE ${sql.raw(fullTableName)}
+                        SET ${sql.raw(setClause)}
+                        WHERE ${sql.raw(whereClause)}
+                    `.execute(kysely)
+
+                    return {
+                        success: true,
+                        rowsAffected: result.rows.length,
+                    }
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+                    const fullTableName = `"${input.tableName}"`
+                    const formatValue = (val: unknown): string => {
+                        if (val === null || val === undefined) return 'NULL'
+                        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
+                        return String(val)
+                    }
+
+                    const setClause = dataEntries
+                        .map(([col, val]) => `"${col}" = ${formatValue(val)}`)
+                        .join(', ')
+
+                    const whereClause = pkEntries
+                        .map(([col, val]) => `"${col}" = ${formatValue(val)}`)
+                        .join(' AND ')
+
+                    await sql`
+                        UPDATE ${sql.raw(fullTableName)}
+                        SET ${sql.raw(setClause)}
+                        WHERE ${sql.raw(whereClause)}
+                    `.execute(kysely)
 
                     return {
                         success: true,
@@ -345,6 +380,39 @@ export const insertRow = orpc
                     }
                 }
 
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
+                    const formatValue = (val: unknown): string => {
+                        if (val === null || val === undefined) return 'NULL'
+                        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
+                        return String(val)
+                    }
+                    const columns = dataEntries.map(([col]) => `"${col}"`).join(', ')
+                    const values = dataEntries.map(([, val]) => formatValue(val)).join(', ')
+                    await sql`
+                        INSERT INTO ${sql.raw(fullTableName)} (${sql.raw(columns)})
+                        VALUES (${sql.raw(values)})
+                    `.execute(kysely)
+                    return { success: true }
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+                    const fullTableName = `"${input.tableName}"`
+                    const columns = dataEntries.map(([col]) => `"${col}"`).join(', ')
+                    const values = dataEntries.map(([, val]) => {
+                        if (val === null || val === undefined) return 'NULL'
+                        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
+                        return String(val)
+                    }).join(', ')
+                    await sql`
+                        INSERT INTO ${sql.raw(fullTableName)} (${sql.raw(columns)})
+                        VALUES (${sql.raw(values)})
+                    `.execute(kysely)
+                    return { success: true }
+                }
+
                 default:
                     throw new ORPCError('NOT_IMPLEMENTED', {
                         message: `Row insert not implemented for ${connection.type}`,
@@ -498,6 +566,32 @@ export const deleteRow = orpc
                         success: true,
                         rowsAffected: 1,
                     }
+                }
+
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
+                    const whereClause = pkEntries
+                        .map(([col, val]) => `"${col}" = '${String(val).replace(/'/g, "''")}'`)
+                        .join(' AND ')
+                    await sql`
+                        DELETE FROM ${sql.raw(fullTableName)}
+                        WHERE ${sql.raw(whereClause)}
+                    `.execute(kysely)
+                    return { success: true, rowsAffected: 1 }
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+                    const fullTableName = `"${input.tableName}"`
+                    const whereClause = pkEntries
+                        .map(([col, val]) => `"${col}" = '${String(val).replace(/'/g, "''")}'`)
+                        .join(' AND ')
+                    await sql`
+                        DELETE FROM ${sql.raw(fullTableName)}
+                        WHERE ${sql.raw(whereClause)}
+                    `.execute(kysely)
+                    return { success: true, rowsAffected: 1 }
                 }
 
                 default:

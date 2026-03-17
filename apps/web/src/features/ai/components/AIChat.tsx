@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, X, Sparkles, Settings, RefreshCw, AlertCircle, Play, Copy, Check } from 'lucide-react'
+import { Send, X, Sparkles, Settings, RefreshCw, AlertCircle, Play, Copy, Check, Clock3 } from 'lucide-react'
 import {
     PROVIDERS,
     MODELS,
@@ -8,6 +8,7 @@ import {
     providerRequiresCredentials,
 } from '../services/aiConfig'
 import aiService from '../services/aiService'
+import { useRecentQueries } from '../hooks/useRecentQueries'
 import './ai-chat.css'
 
 interface AIChatProps {
@@ -49,14 +50,31 @@ export function AIChat({
     const [isLoading, setIsLoading] = useState(false)
     const [showSettings, setShowSettings] = useState(false)
     const [copiedId, setCopiedId] = useState<string | null>(null)
+    const [showRecentQueries, setShowRecentQueries] = useState(false)
 
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const inputSectionRef = useRef<HTMLDivElement>(null)
+    const { recentQueries, addRecentQuery } = useRecentQueries()
 
     // Scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages, isLoading])
+
+    useEffect(() => {
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!inputSectionRef.current?.contains(event.target as Node)) {
+                setShowRecentQueries(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handlePointerDown)
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown)
+        }
+    }, [])
 
     // AI Settings
     const [selectedProvider, setSelectedProvider] = useState(
@@ -129,10 +147,15 @@ export function AIChat({
         e.preventDefault()
         if (!input.trim() || isLoading) return
 
+        const nextInput = input.trim()
+
+        addRecentQuery(nextInput)
+        setShowRecentQueries(false)
+
         const userMsg: Message = {
             id: Date.now().toString(),
             role: 'user',
-            content: input,
+            content: nextInput,
             timestamp: new Date(),
         }
         setMessages(prev => [...prev, userMsg])
@@ -184,6 +207,12 @@ export function AIChat({
             e.preventDefault()
             handleSubmit(e as any)
         }
+    }
+
+    const handleRecentQuerySelect = (query: string) => {
+        setInput(query)
+        setShowRecentQueries(false)
+        requestAnimationFrame(() => inputRef.current?.focus())
     }
 
     const themeClass = isDarkTheme ? 'dark-theme' : 'light-theme'
@@ -718,7 +747,7 @@ export function AIChat({
             </div>
 
             {/* Input Section */}
-            <div style={{
+            <div ref={inputSectionRef} style={{
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
@@ -727,11 +756,38 @@ export function AIChat({
                 background: '#1a1a1a',
                 flexShrink: 0,
             }}>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+                    <button
+                        type="button"
+                        onClick={() => setShowRecentQueries((current) => !current)}
+                        disabled={isLoading}
+                        title="Recent queries"
+                        style={{
+                            width: '44px',
+                            height: '44px',
+                            border: '1px solid #3a3a3a',
+                            background: '#2a2a2a',
+                            color: '#d4d4d4',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                            opacity: isLoading ? 0.6 : 1,
+                            flexShrink: 0,
+                        }}
+                    >
+                        <Clock3 size={18} />
+                    </button>
                     <textarea
                         ref={inputRef}
                         value={input}
                         onChange={e => setInput(e.target.value)}
+                        onFocus={() => {
+                            if (recentQueries.length > 0) {
+                                setShowRecentQueries(true)
+                            }
+                        }}
                         onKeyDown={handleKeyDown}
                         placeholder="Ask me anything about your data..."
                         disabled={isLoading}
@@ -754,6 +810,53 @@ export function AIChat({
                             transition: '0.15s border-color, 0.15s box-shadow',
                         }}
                     />
+                    {showRecentQueries && recentQueries.length > 0 && (
+                        <div style={{
+                            position: 'absolute',
+                            left: '0',
+                            right: '52px',
+                            bottom: 'calc(100% + 8px)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            padding: '12px',
+                            border: '1px solid #3a3a3a',
+                            borderRadius: '12px',
+                            background: '#1f1f1f',
+                            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.32)',
+                            zIndex: 10,
+                        }}>
+                            <div style={{
+                                fontSize: '11px',
+                                color: '#9fb0c8',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                fontWeight: 600,
+                            }}>
+                                Recent Queries
+                            </div>
+                            {recentQueries.map((query) => (
+                                <button
+                                    key={query}
+                                    type="button"
+                                    onClick={() => handleRecentQuerySelect(query)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #3a3a3a',
+                                        borderRadius: '8px',
+                                        background: '#2a2a2a',
+                                        color: '#d4d4d4',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                    }}
+                                >
+                                    {query}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <button
                         onClick={handleSubmit}
                         disabled={!input.trim() || isLoading}

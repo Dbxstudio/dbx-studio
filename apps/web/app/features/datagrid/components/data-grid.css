@@ -343,6 +343,29 @@
     font-weight: 500;
 }
 
+/* Properties Button (in toolbar) */
+.toolbar-properties-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    background: transparent;
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    color: #bbb;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    line-height: 1;
+    margin-left: 4px;
+}
+
+.toolbar-properties-btn:hover {
+    background: #2a2a2a;
+    border-color: #555;
+    color: #fff;
+}
+
 .more-indicator {
     color: var(--grid-text-secondary);
     font-size: 12px;

@@ -8,7 +8,7 @@ import { MAIN_SERVER_ENDPOINT } from '../constants/serverConfig'
 export interface Connection {
     id: string
     name: string
-    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake'
+    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake' | 'supabase' | 'redshift' | 'sqlite'
     userId?: string
     host?: string
     port?: number
@@ -42,6 +42,10 @@ export interface CreateConnectionInput {
     role?: string
     label?: string
     color?: string
+    connectionString?: string
+    showAllDatabases?: boolean
+    requireServerRegistration?: boolean
+    serverDriver?: 'mysql' | 'mariadb'
 }
 
 // Query Keys
@@ -58,6 +62,137 @@ function extractData<T>(result: any): T {
         return result.json as T
     }
     return result as T
+}
+
+type ConnectionMutationInput = CreateConnectionInput
+
+function getServerRegistrationConfig(input: ConnectionMutationInput) {
+    const {
+        showAllDatabases,
+        requireServerRegistration,
+        serverDriver,
+        ...localInput
+    } = input
+
+    return {
+        localInput,
+        serverInput: {
+            showAllDatabases,
+            requireServerRegistration: requireServerRegistration ?? false,
+            serverDriver,
+        },
+    }
+}
+
+function buildConnectionString(input: Omit<CreateConnectionInput, 'showAllDatabases' | 'requireServerRegistration' | 'serverDriver'>) {
+    const username = encodeURIComponent(input.username || '')
+    const password = encodeURIComponent(input.password || '')
+    const host = input.host || 'localhost'
+    const port = input.port || 5432
+    const database = input.database || ''
+
+    let driver: string = input.type
+    let connectionString = ''
+
+    if (input.type === 'postgresql') {
+        driver = 'postgres'
+        connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+    } else if (input.type === 'mysql') {
+        connectionString = `mysql+asyncmy://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+    } else if (input.type === 'snowflake') {
+        const account = input.account || ''
+        connectionString = `snowflake://${username}:${password}@${account}${database ? '/' + database : ''}`
+    } else if (input.type === 'supabase') {
+        driver = 'postgres'
+        if (input.connectionString) {
+            connectionString = input.connectionString
+        } else {
+            connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+        }
+    } else if (input.type === 'redshift') {
+        driver = 'redshift'
+        connectionString = `redshift+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+    } else if (input.type === 'sqlite') {
+        driver = 'sqlite'
+        connectionString = `sqlite+aiosqlite:///${database}`
+    } else {
+        connectionString = `${driver}://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
+    }
+
+    return {
+        connectionString,
+        driver,
+    }
+}
+
+async function extractErrorMessage(response: Response): Promise<string> {
+    try {
+        const text = await response.text()
+        if (!text) {
+            return `Request failed with status ${response.status}`
+        }
+
+        try {
+            const parsed = JSON.parse(text)
+            return parsed?.message || parsed?.error || text
+        } catch {
+            return text
+        }
+    } catch {
+        return `Request failed with status ${response.status}`
+    }
+}
+
+async function registerConnectionWithMainServer(
+    input: Omit<CreateConnectionInput, 'showAllDatabases' | 'requireServerRegistration' | 'serverDriver'>,
+    options: { showAllDatabases?: boolean; requireServerRegistration: boolean; serverDriver?: 'mysql' | 'mariadb' },
+    connectionId: string,
+) {
+    const mainServerUrl = MAIN_SERVER_ENDPOINT
+    const { connectionString, driver } = buildConnectionString(input)
+    const serverDriver = options.serverDriver || driver
+
+    try {
+        const payload: Record<string, unknown> = {
+            db_connection_string: connectionString,
+            driver: serverDriver,
+        }
+
+        if (typeof options.showAllDatabases === 'boolean' && (serverDriver === 'mysql' || serverDriver === 'mariadb')) {
+            payload.show_all_databases = options.showAllDatabases
+        }
+
+        const serverResponse = await authenticatedFetch(`${mainServerUrl}/llm-inference/create-connection`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        })
+
+        if (!serverResponse.ok) {
+            throw new Error(await extractErrorMessage(serverResponse))
+        }
+
+        const serverResult = await serverResponse.json()
+        const externalConnId = serverResult?.connection?.connection_id
+
+        if (!externalConnId) {
+            throw new Error('AI server did not return a connection ID')
+        }
+
+        await api.connections.update({
+            id: connectionId,
+            externalConnectionId: externalConnId,
+        })
+
+        return externalConnId as string
+    } catch (serverError) {
+        const msg = serverError instanceof Error ? serverError.message : 'Could not register connection with AI server'
+        console.warn('⚠️ Could not register connection with AI server:', serverError)
+        toast.warning(`Connection saved. AI features unavailable: ${msg}`)
+        return undefined
+    }
 }
 
 /**
@@ -85,73 +220,18 @@ export function useCreateConnection() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async (input: CreateConnectionInput) => {
+        mutationFn: async (input: ConnectionMutationInput) => {
+            const { localInput, serverInput } = getServerRegistrationConfig(input)
+
             // First create connection in local database
-            const result = await api.connections.create(input)
+            const result = await api.connections.create(localInput)
             const connection = extractData<Connection>(result)
 
-            // Then register with main server for AI features (non-blocking)
-            try {
-                const mainServerUrl = MAIN_SERVER_ENDPOINT
+            const externalConnId = await registerConnectionWithMainServer(localInput, serverInput, connection.id)
 
-                // Build connection string based on type
-                const username = encodeURIComponent(input.username || '')
-                const password = encodeURIComponent(input.password || '')
-                const host = input.host || 'localhost'
-                const port = input.port || 5432
-                const database = input.database || ''
-
-                let driver: string = input.type
-                let connectionString = ''
-
-                if (input.type === 'postgresql') {
-                    driver = 'postgres'
-                    connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-                } else if (input.type === 'mysql') {
-                    connectionString = `mysql+asyncmy://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-                } else if (input.type === 'snowflake') {
-                    // Snowflake uses account instead of host
-                    const account = input.account || ''
-                    connectionString = `snowflake://${username}:${password}@${account}${database ? '/' + database : ''}`
-                } else {
-                    connectionString = `${driver}://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-                }
-
-                // Get auth token (using correct key for Firebase token)
-                // authenticatedFetch handles token refresh automatically
-
-                // Register with main server using authenticatedFetch
-                // This automatically handles 401 with token refresh and retry
-                const serverResponse = await authenticatedFetch(`${mainServerUrl}/llm-inference/create-connection`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        db_connection_string: connectionString,
-                        driver: driver
-                    })
-                })
-
-                if (serverResponse.ok) {
-                    const serverResult = await serverResponse.json()
-                    const externalConnId = serverResult.connection?.connection_id
-
-                    if (externalConnId) {
-                        // Update local connection with external ID
-                        await api.connections.update({
-                            id: connection.id,
-                            externalConnectionId: externalConnId
-                        })
-                        connection.externalConnectionId = externalConnId
-                        console.log('✅ Connection registered with server, external ID:', externalConnId)
-                    }
-                } else {
-                    console.warn('⚠️ Failed to register connection with main server:', serverResponse.status)
-                }
-            } catch (serverError) {
-                // Don't fail the whole operation if server registration fails
-                console.warn('⚠️ Could not register connection with AI server:', serverError)
+            if (externalConnId) {
+                connection.externalConnectionId = externalConnId
+                console.log('✅ Connection registered with server, external ID:', externalConnId)
             }
 
             return connection
@@ -174,8 +254,37 @@ export function useUpdateConnection() {
 
     return useMutation({
         mutationFn: async (input: { id: string } & Partial<CreateConnectionInput>) => {
-            const result = await api.connections.update(input)
-            return extractData<Connection>(result)
+            const { id, ...rest } = input
+            const { localInput, serverInput } = getServerRegistrationConfig(rest as ConnectionMutationInput)
+            const result = await api.connections.update({ id, ...localInput })
+            const connection = extractData<Connection>(result)
+
+            const type = localInput.type || connection.type
+            const registrationInput = {
+                name: localInput.name || connection.name,
+                type,
+                userId: localInput.userId || connection.userId,
+                host: localInput.host ?? connection.host,
+                port: localInput.port ?? connection.port,
+                database: localInput.database ?? connection.database,
+                username: localInput.username ?? connection.username,
+                password: localInput.password,
+                ssl: localInput.ssl ?? connection.ssl,
+                account: localInput.account ?? connection.account,
+                warehouse: localInput.warehouse ?? connection.warehouse,
+                role: localInput.role ?? connection.role,
+                label: localInput.label ?? connection.label,
+                color: localInput.color ?? connection.color,
+                connectionString: localInput.connectionString ?? connection.connectionString,
+            } satisfies Omit<CreateConnectionInput, 'showAllDatabases' | 'requireServerRegistration' | 'serverDriver'>
+
+            const externalConnId = await registerConnectionWithMainServer(registrationInput, serverInput, id)
+
+            if (externalConnId) {
+                connection.externalConnectionId = externalConnId
+            }
+
+            return connection
         },
         onSuccess: () => {
             // Invalidate all connection queries (including filtered by userId)

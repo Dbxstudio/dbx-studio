@@ -1,10 +1,10 @@
 import { FaTimes, FaDatabase } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSnowflake, SiSqlite, SiMariadb } from 'react-icons/si'
+import { SiSnowflake, SiSqlite, SiSupabase, SiAmazonredshift } from 'react-icons/si'
 import './connection-modal.css'
 
-export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake'
+export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase' | 'redshift'
 
 interface ConnectionTypeConfig {
     type: ConnectionType
@@ -22,25 +22,34 @@ const connectionTypes: ConnectionTypeConfig[] = [
         description: 'Connect to PostgreSQL database'
     },
     {
+        type: 'supabase',
+        name: 'Supabase',
+        icon: <SiSupabase size={40} className="connection-type-icon supabase" />,
+        description: 'Connect to Supabase project'
+    },
+    {
         type: 'snowflake',
         name: 'Snowflake',
         icon: <SiSnowflake size={40} className="connection-type-icon snowflake" />,
         description: 'Connect to Snowflake Data Cloud',
-        comingSoon: true
     },
     {
         type: 'mysql',
         name: 'MySQL',
         icon: <GrMysql size={40} className="connection-type-icon mysql" />,
-        description: 'Connect to MySQL database',
-        comingSoon: true
+        description: 'Connect to MySQL database'
     },
     {
         type: 'sqlite',
         name: 'SQLite',
         icon: <SiSqlite size={40} className="connection-type-icon sqlite" />,
-        description: 'Connect to SQLite database',
-        comingSoon: true
+        description: 'Connect to SQLite databases',
+    },
+    {
+        type: 'redshift',
+        name: 'Amazon Redshift',
+        icon: <SiAmazonredshift size={40} className="connection-type-icon redshift" />,
+        description: 'Connect to Amazon Redshift',
     },
     {
         type: 'mssql',

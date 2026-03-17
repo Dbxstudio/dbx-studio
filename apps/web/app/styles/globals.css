@@ -227,6 +227,52 @@ body {
   overflow: hidden;
 }
 
+/* Table sub-tab bar (Data / Properties) */
+.table-sub-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 12px;
+  background: #161616;
+  border-bottom: 1px solid #2d2d2d;
+  flex-shrink: 0;
+  height: 34px;
+}
+
+.table-sub-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: #777;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.12s, border-color 0.12s;
+  line-height: 1;
+}
+
+.table-sub-tab:hover {
+  color: #ccc;
+}
+
+.table-sub-tab.active {
+  color: #fff;
+  border-bottom-color: #4a9eff;
+}
+
+/* Table sub-content fills remaining space */
+.table-sub-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Dashboard View */
 .dashboard-view {
   flex: 1;

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Sidebar } from '~/features/layout'
-import { SchemaTree } from '~/features/schema'
+import { SchemaTree, TableProperties } from '~/features/schema'
 import { ConnectionModal } from '~/features/connections'
 import { SQLEditor } from '~/features/editor'
 import { ResultsPanel } from '~/features/results'
@@ -83,6 +83,9 @@ export default function Workspace() {
     const [queryColumns, setQueryColumns] = useState<{ name: string; type?: string }[]>([])
     const [queryError, setQueryError] = useState<string | null>(null)
     const [executionTime, setExecutionTime] = useState<number | undefined>(undefined)
+
+    // Sub-tab for table view: 'data' | 'properties'
+    const [tableSubTab, setTableSubTab] = useState<'data' | 'properties'>('data')
 
     // API data - filter connections by user_id
     const { data: connectionsData } = useConnections(user?.user_id)
@@ -648,40 +651,53 @@ export default function Workspace() {
                                         </>
                                     ) : activeTab?.type === 'table' ? (
                                         <div className="table-data-section">
-                                            <DataGrid
-                                                columns={tableColumnsData?.map(c => ({
-                                                    id: c.name,
-                                                    name: c.name,
-                                                    type: c.type,
-                                                    isPrimaryKey: c.isPrimaryKey,
-                                                    isNullable: c.nullable,
-                                                    isForeignKey: c.isForeignKey,
-                                                    foreignSchema: c.foreignSchema,
-                                                    foreignTable: c.foreignTable,
-                                                    foreignColumn: c.foreignColumn,
-                                                })) || []}
-                                                data={tableDataRows}
-                                                tableName={activeTab.tableName}
-                                                schema={activeTab.schema}
-                                                loading={!tableColumnsData || isLoadingTableData}
-                                                readOnly={false}
-                                                hasMore={hasNextPage}
-                                                isFetchingMore={isFetchingNextPage}
-                                                totalCount={tableTotalCount}
-                                                onLoadMore={() => {
-                                                    if (!isFetchingNextPage && hasNextPage) {
-                                                        fetchNextPage()
-                                                    }
-                                                }}
-                                                onRefresh={() => {
-                                                    refetchTableData()
-                                                }}
-                                                onCellEdit={handleCellEdit}
-                                                onRowDelete={handleRowDelete}
-                                                onForeignKeyNavigate={handleForeignKeyNavigate}
-                                                canNavigateBack={!!activeTab.history?.length}
-                                                onNavigateBack={handleNavigateBack}
-                                            />
+                                            {tableSubTab === 'data' ? (
+                                                <DataGrid
+                                                    columns={tableColumnsData?.map(c => ({
+                                                        id: c.name,
+                                                        name: c.name,
+                                                        type: c.type,
+                                                        isPrimaryKey: c.isPrimaryKey,
+                                                        isNullable: c.nullable,
+                                                        isForeignKey: c.isForeignKey,
+                                                        foreignSchema: c.foreignSchema,
+                                                        foreignTable: c.foreignTable,
+                                                        foreignColumn: c.foreignColumn,
+                                                    })) || []}
+                                                    data={tableDataRows}
+                                                    tableName={activeTab.tableName}
+                                                    schema={activeTab.schema}
+                                                    loading={!tableColumnsData || isLoadingTableData}
+                                                    readOnly={false}
+                                                    hasMore={hasNextPage}
+                                                    isFetchingMore={isFetchingNextPage}
+                                                    totalCount={tableTotalCount}
+                                                    onLoadMore={() => {
+                                                        if (!isFetchingNextPage && hasNextPage) {
+                                                            fetchNextPage()
+                                                        }
+                                                    }}
+                                                    onRefresh={() => {
+                                                        refetchTableData()
+                                                    }}
+                                                    onCellEdit={handleCellEdit}
+                                                    onRowDelete={handleRowDelete}
+                                                    onForeignKeyNavigate={handleForeignKeyNavigate}
+                                                    canNavigateBack={!!activeTab.history?.length}
+                                                    onNavigateBack={handleNavigateBack}
+                                                    onShowProperties={() => setTableSubTab('properties')}
+                                                />
+                                            ) : (
+                                                <TableProperties
+                                                    tableName={activeTab.tableName || ''}
+                                                    schema={activeTab.schema || 'public'}
+                                                    databaseName={selectedConnection?.database || selectedConnection?.name}
+                                                    columns={tableColumnsData || []}
+                                                    loading={!tableColumnsData}
+                                                    onRefresh={() => refetchTableData()}
+                                                    onBackToData={() => setTableSubTab('data')}
+                                                />
+                                            )}
                                         </div>
                                     ) : null}
                                 </div>

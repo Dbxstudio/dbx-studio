@@ -5,7 +5,12 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createSupabaseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -26,6 +31,7 @@ interface ColumnInfo {
     foreignSchema: string | null
     foreignTable: string | null
     foreignColumn: string | null
+    indexName: string | null
 }
 
 /**
@@ -48,6 +54,271 @@ export const columns = orpc
             switch (connection.type) {
                 case 'postgresql': {
                     const kysely = createPostgresConnection(connection)
+                    const result = await sql<{
+                        column_name: string
+                        data_type: string
+                        is_nullable: string
+                        column_default: string | null
+                        is_primary: boolean
+                        is_unique: boolean
+                        is_foreign: boolean
+                        foreign_schema: string | null
+                        foreign_table: string | null
+                        foreign_column: string | null
+                        index_name: string | null
+                    }>`
+                        SELECT 
+                            c.column_name,
+                            c.data_type,
+                            c.is_nullable,
+                            c.column_default,
+                            CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary,
+                            CASE WHEN uq.column_name IS NOT NULL THEN true ELSE false END as is_unique,
+                            CASE WHEN fk.column_name IS NOT NULL THEN true ELSE false END as is_foreign,
+                            fk.foreign_schema,
+                            fk.foreign_table,
+                            fk.foreign_column,
+                            col_idx.index_name
+                        FROM information_schema.columns c
+                        LEFT JOIN (
+                            SELECT kcu.column_name
+                            FROM information_schema.table_constraints tc
+                            JOIN information_schema.key_column_usage kcu 
+                                ON tc.constraint_name = kcu.constraint_name
+                                AND tc.table_schema = kcu.table_schema
+                            WHERE tc.table_schema = ${input.schema}
+                                AND tc.table_name = ${input.tableName}
+                                AND tc.constraint_type = 'PRIMARY KEY'
+                        ) pk ON c.column_name = pk.column_name
+                        LEFT JOIN (
+                            SELECT kcu.column_name
+                            FROM information_schema.table_constraints tc
+                            JOIN information_schema.key_column_usage kcu 
+                                ON tc.constraint_name = kcu.constraint_name
+                                AND tc.table_schema = kcu.table_schema
+                            WHERE tc.table_schema = ${input.schema}
+                                AND tc.table_name = ${input.tableName}
+                                AND tc.constraint_type = 'UNIQUE'
+                        ) uq ON c.column_name = uq.column_name
+                        LEFT JOIN (
+                            SELECT 
+                                kcu.column_name,
+                                ccu.table_schema as foreign_schema,
+                                ccu.table_name as foreign_table,
+                                ccu.column_name as foreign_column
+                            FROM information_schema.table_constraints tc
+                            JOIN information_schema.key_column_usage kcu 
+                                ON tc.constraint_name = kcu.constraint_name
+                                AND tc.table_schema = kcu.table_schema
+                            JOIN information_schema.constraint_column_usage ccu 
+                                ON tc.constraint_name = ccu.constraint_name
+                                AND tc.table_schema = ccu.constraint_schema
+                            WHERE tc.table_schema = ${input.schema}
+                                AND tc.table_name = ${input.tableName}
+                                AND tc.constraint_type = 'FOREIGN KEY'
+                        ) fk ON c.column_name = fk.column_name
+                        LEFT JOIN (
+                            SELECT DISTINCT ON (a.attname)
+                                a.attname AS col_name,
+                                i.relname AS index_name
+                            FROM pg_class t
+                            JOIN pg_namespace n ON n.oid = t.relnamespace
+                            JOIN pg_index ix ON t.oid = ix.indrelid
+                            JOIN pg_class i ON i.oid = ix.indexrelid
+                            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+                            WHERE n.nspname = ${input.schema}
+                              AND t.relname = ${input.tableName}
+                            ORDER BY a.attname, i.relname
+                        ) col_idx ON c.column_name = col_idx.col_name
+                        WHERE c.table_schema = ${input.schema}
+                            AND c.table_name = ${input.tableName}
+                        ORDER BY c.ordinal_position
+                    `.execute(kysely)
+
+                    return result.rows.map(row => ({
+                        name: row.column_name,
+                        type: row.data_type,
+                        nullable: row.is_nullable === 'YES',
+                        defaultValue: row.column_default,
+                        isPrimaryKey: row.is_primary,
+                        isUnique: row.is_unique,
+                        isForeignKey: row.is_foreign,
+                        foreignSchema: row.foreign_schema,
+                        foreignTable: row.foreign_table,
+                        foreignColumn: row.foreign_column,
+                        indexName: row.index_name,
+                    }))
+                }
+
+                case 'mysql': {
+                    const kysely = createMysqlConnection(connection)
+                    const database = input.schema === 'public'
+                        ? connection.database || 'mysql'
+                        : input.schema
+                    const result = await sql<{
+                        COLUMN_NAME: string
+                        DATA_TYPE: string
+                        IS_NULLABLE: string
+                        COLUMN_DEFAULT: string | null
+                        COLUMN_KEY: string
+                        REFERENCED_TABLE_SCHEMA: string | null
+                        REFERENCED_TABLE_NAME: string | null
+                        REFERENCED_COLUMN_NAME: string | null
+                    }>`
+                        SELECT 
+                            c.COLUMN_NAME,
+                            c.DATA_TYPE,
+                            c.IS_NULLABLE,
+                            c.COLUMN_DEFAULT,
+                            c.COLUMN_KEY,
+                            kcu.REFERENCED_TABLE_SCHEMA,
+                            kcu.REFERENCED_TABLE_NAME,
+                            kcu.REFERENCED_COLUMN_NAME
+                        FROM information_schema.COLUMNS c
+                        LEFT JOIN information_schema.KEY_COLUMN_USAGE kcu
+                            ON c.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+                            AND c.TABLE_NAME = kcu.TABLE_NAME
+                            AND c.COLUMN_NAME = kcu.COLUMN_NAME
+                            AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+                        WHERE c.TABLE_SCHEMA = ${database}
+                            AND c.TABLE_NAME = ${input.tableName}
+                        ORDER BY c.ORDINAL_POSITION
+                    `.execute(kysely)
+
+                    return result.rows.map(row => ({
+                        name: row.COLUMN_NAME,
+                        type: row.DATA_TYPE,
+                        nullable: row.IS_NULLABLE === 'YES',
+                        defaultValue: row.COLUMN_DEFAULT,
+                        isPrimaryKey: row.COLUMN_KEY === 'PRI',
+                        isUnique: row.COLUMN_KEY === 'UNI',
+                        isForeignKey: row.COLUMN_KEY === 'MUL' && !!row.REFERENCED_TABLE_NAME,
+                        foreignSchema: row.REFERENCED_TABLE_SCHEMA,
+                        foreignTable: row.REFERENCED_TABLE_NAME,
+                        foreignColumn: row.REFERENCED_COLUMN_NAME,
+                        indexName: null,
+                    }))
+                }
+
+                case 'mssql': {
+                    const pool = await createMssqlConnection(connection)
+                    const result = await pool.query<{
+                        COLUMN_NAME: string
+                        DATA_TYPE: string
+                        IS_NULLABLE: string
+                        COLUMN_DEFAULT: string | null
+                        IS_PRIMARY: boolean
+                        FOREIGN_SCHEMA: string | null
+                        FOREIGN_TABLE: string | null
+                        FOREIGN_COLUMN: string | null
+                    }>`
+                        SELECT 
+                            c.COLUMN_NAME,
+                            c.DATA_TYPE,
+                            c.IS_NULLABLE,
+                            c.COLUMN_DEFAULT,
+                            CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as IS_PRIMARY,
+                            fk.FOREIGN_SCHEMA,
+                            fk.FOREIGN_TABLE,
+                            fk.FOREIGN_COLUMN
+                        FROM INFORMATION_SCHEMA.COLUMNS c
+                        LEFT JOIN (
+                            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                            WHERE OBJECTPROPERTY(OBJECT_ID(CONSTRAINT_NAME), 'IsPrimaryKey') = 1
+                                AND TABLE_NAME = @table
+                        ) pk ON c.COLUMN_NAME = pk.COLUMN_NAME
+                        LEFT JOIN (
+                            SELECT 
+                                kcu.COLUMN_NAME,
+                                kcu2.TABLE_SCHEMA as FOREIGN_SCHEMA,
+                                kcu2.TABLE_NAME as FOREIGN_TABLE,
+                                kcu2.COLUMN_NAME as FOREIGN_COLUMN
+                            FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+                            JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+                                ON rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                            JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu2
+                                ON rc.UNIQUE_CONSTRAINT_NAME = kcu2.CONSTRAINT_NAME
+                            WHERE kcu.TABLE_NAME = @table AND kcu.TABLE_SCHEMA = @schema
+                        ) fk ON c.COLUMN_NAME = fk.COLUMN_NAME
+                        WHERE c.TABLE_NAME = @table AND c.TABLE_SCHEMA = @schema
+                        ORDER BY c.ORDINAL_POSITION
+                    `
+
+                    return (result.recordset || []).map(row => ({
+                        name: row.COLUMN_NAME,
+                        type: row.DATA_TYPE,
+                        nullable: row.IS_NULLABLE === 'YES',
+                        defaultValue: row.COLUMN_DEFAULT,
+                        isPrimaryKey: row.IS_PRIMARY,
+                        isUnique: false,
+                        isForeignKey: !!row.FOREIGN_TABLE,
+                        foreignSchema: row.FOREIGN_SCHEMA,
+                        foreignTable: row.FOREIGN_TABLE,
+                        foreignColumn: row.FOREIGN_COLUMN,
+                        indexName: null,
+                    }))
+                }
+
+                case 'clickhouse': {
+                    // ClickHouse doesn't support foreign keys, so we just return null for FK fields
+                    const client = createClickHouseConnection(connection)
+                    const result = await client.query({
+                        query: `
+                            SELECT name, type, default_expression, is_in_primary_key
+                            FROM system.columns
+                            WHERE database = {database:String} AND table = {table:String}
+                            ORDER BY position
+                        `,
+                        query_params: {
+                            database: connection.database || 'default',
+                            table: input.tableName,
+                        },
+                        format: 'JSONEachRow',
+                    })
+                    const rows = await result.json() as any[]
+
+                    return rows.map(row => ({
+                        name: row.name,
+                        type: row.type,
+                        nullable: row.type.includes('Nullable'),
+                        defaultValue: row.default_expression || null,
+                        isPrimaryKey: row.is_in_primary_key === 1,
+                        isUnique: false,
+                        isForeignKey: false,
+                        foreignSchema: null,
+                        foreignTable: null,
+                        foreignColumn: null,
+                        indexName: null,
+                    }))
+                }
+
+                case 'snowflake': {
+                    // Use SHOW COLUMNS for Snowflake
+                    const conn = createSnowflakeConnection(connection)
+                    const database = connection.database || ''
+                    const schema = input.schema || 'PUBLIC'
+                    const querySql = database
+                        ? `SHOW COLUMNS IN TABLE "${database}"."${schema.toUpperCase()}"."${input.tableName.toUpperCase()}"`
+                        : `SHOW COLUMNS IN TABLE "${schema.toUpperCase()}"."${input.tableName.toUpperCase()}"`
+                    const sfRows = await executeSnowflakeQuery(conn, querySql) as any[]
+                    return sfRows.map((row: any) => ({
+                        name: row.column_name || row['column_name'] || '',
+                        type: row.data_type ? JSON.parse(row.data_type)?.type || row.data_type : 'UNKNOWN',
+                        nullable: row.null === 'Y' || row.null === true,
+                        defaultValue: row.default || null,
+                        isPrimaryKey: row.primary_key === 'Y',
+                        isUnique: row.unique_key === 'Y',
+                        isForeignKey: row.foreign_key === 'Y',
+                        foreignSchema: null,
+                        foreignTable: null,
+                        foreignColumn: null,
+                        indexName: null,
+                    }))
+                }
+
+                case 'supabase': {
+                    // Supabase = PostgreSQL schema introspection
+                    const kysely = createSupabaseConnection(connection)
                     const result = await sql<{
                         column_name: string
                         data_type: string
@@ -125,148 +396,132 @@ export const columns = orpc
                         foreignSchema: row.foreign_schema,
                         foreignTable: row.foreign_table,
                         foreignColumn: row.foreign_column,
+                        indexName: null,
                     }))
                 }
 
-                case 'mysql': {
-                    const kysely = createMysqlConnection(connection)
-                    const database = connection.database || 'mysql'
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
                     const result = await sql<{
-                        COLUMN_NAME: string
-                        DATA_TYPE: string
-                        IS_NULLABLE: string
-                        COLUMN_DEFAULT: string | null
-                        COLUMN_KEY: string
-                        REFERENCED_TABLE_SCHEMA: string | null
-                        REFERENCED_TABLE_NAME: string | null
-                        REFERENCED_COLUMN_NAME: string | null
+                        column_name: string
+                        data_type: string
+                        is_nullable: string
+                        column_default: string | null
+                        is_primary: boolean
+                        is_unique: boolean
+                        is_foreign: boolean
+                        foreign_schema: string | null
+                        foreign_table: string | null
+                        foreign_column: string | null
                     }>`
                         SELECT 
-                            c.COLUMN_NAME,
-                            c.DATA_TYPE,
-                            c.IS_NULLABLE,
-                            c.COLUMN_DEFAULT,
-                            c.COLUMN_KEY,
-                            kcu.REFERENCED_TABLE_SCHEMA,
-                            kcu.REFERENCED_TABLE_NAME,
-                            kcu.REFERENCED_COLUMN_NAME
-                        FROM information_schema.COLUMNS c
-                        LEFT JOIN information_schema.KEY_COLUMN_USAGE kcu
-                            ON c.TABLE_SCHEMA = kcu.TABLE_SCHEMA
-                            AND c.TABLE_NAME = kcu.TABLE_NAME
-                            AND c.COLUMN_NAME = kcu.COLUMN_NAME
-                            AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-                        WHERE c.TABLE_SCHEMA = ${database}
-                            AND c.TABLE_NAME = ${input.tableName}
-                        ORDER BY c.ORDINAL_POSITION
+                            c.column_name,
+                            c.data_type,
+                            c.is_nullable,
+                            c.column_default,
+                            EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints tc
+                                JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+                                WHERE c.table_schema = tc.constraint_schema
+                                    AND tc.table_name = c.table_name 
+                                    AND ccu.column_name = c.column_name
+                                    AND tc.constraint_type = 'PRIMARY KEY'
+                            ) as "is_primary",
+                            EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints tc
+                                JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+                                WHERE c.table_schema = tc.constraint_schema
+                                    AND tc.table_name = c.table_name 
+                                    AND ccu.column_name = c.column_name
+                                    AND tc.constraint_type = 'UNIQUE'
+                            ) as "is_unique",
+                            fk.constraint_name IS NOT NULL as "is_foreign",
+                            fk.foreign_schema,
+                            fk.foreign_table,
+                            fk.foreign_column
+                        FROM information_schema.columns c
+                        LEFT JOIN (
+                            SELECT 
+                                kcu.column_name,
+                                tc.constraint_name,
+                                ccu.table_schema as foreign_schema,
+                                ccu.table_name as foreign_table,
+                                ccu.column_name as foreign_column
+                            FROM information_schema.table_constraints tc
+                            JOIN information_schema.key_column_usage kcu 
+                                ON tc.constraint_name = kcu.constraint_name
+                                AND tc.table_schema = kcu.table_schema
+                            JOIN information_schema.constraint_column_usage ccu 
+                                ON tc.constraint_name = ccu.constraint_name
+                                AND tc.table_schema = ccu.constraint_schema
+                            WHERE tc.table_schema = ${input.schema}
+                                AND tc.table_name = ${input.tableName}
+                                AND tc.constraint_type = 'FOREIGN KEY'
+                        ) fk ON c.column_name = fk.column_name
+                        WHERE c.table_schema = ${input.schema}
+                            AND c.table_name = ${input.tableName}
+                        ORDER BY c.ordinal_position
                     `.execute(kysely)
 
                     return result.rows.map(row => ({
-                        name: row.COLUMN_NAME,
-                        type: row.DATA_TYPE,
-                        nullable: row.IS_NULLABLE === 'YES',
-                        defaultValue: row.COLUMN_DEFAULT,
-                        isPrimaryKey: row.COLUMN_KEY === 'PRI',
-                        isUnique: row.COLUMN_KEY === 'UNI',
-                        isForeignKey: row.COLUMN_KEY === 'MUL' && !!row.REFERENCED_TABLE_NAME,
-                        foreignSchema: row.REFERENCED_TABLE_SCHEMA,
-                        foreignTable: row.REFERENCED_TABLE_NAME,
-                        foreignColumn: row.REFERENCED_COLUMN_NAME,
+                        name: row.column_name,
+                        type: row.data_type,
+                        nullable: row.is_nullable === 'YES',
+                        defaultValue: row.column_default,
+                        isPrimaryKey: row.is_primary,
+                        isUnique: row.is_unique,
+                        isForeignKey: row.is_foreign,
+                        foreignSchema: row.foreign_schema,
+                        foreignTable: row.foreign_table,
+                        foreignColumn: row.foreign_column,
+                        indexName: null,
                     }))
                 }
 
-                case 'mssql': {
-                    const pool = await createMssqlConnection(connection)
-                    const result = await pool.query<{
-                        COLUMN_NAME: string
-                        DATA_TYPE: string
-                        IS_NULLABLE: string
-                        COLUMN_DEFAULT: string | null
-                        IS_PRIMARY: boolean
-                        FOREIGN_SCHEMA: string | null
-                        FOREIGN_TABLE: string | null
-                        FOREIGN_COLUMN: string | null
-                    }>`
-                        SELECT 
-                            c.COLUMN_NAME,
-                            c.DATA_TYPE,
-                            c.IS_NULLABLE,
-                            c.COLUMN_DEFAULT,
-                            CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as IS_PRIMARY,
-                            fk.FOREIGN_SCHEMA,
-                            fk.FOREIGN_TABLE,
-                            fk.FOREIGN_COLUMN
-                        FROM INFORMATION_SCHEMA.COLUMNS c
-                        LEFT JOIN (
-                            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                            WHERE OBJECTPROPERTY(OBJECT_ID(CONSTRAINT_NAME), 'IsPrimaryKey') = 1
-                                AND TABLE_NAME = @table
-                        ) pk ON c.COLUMN_NAME = pk.COLUMN_NAME
-                        LEFT JOIN (
-                            SELECT 
-                                kcu.COLUMN_NAME,
-                                kcu2.TABLE_SCHEMA as FOREIGN_SCHEMA,
-                                kcu2.TABLE_NAME as FOREIGN_TABLE,
-                                kcu2.COLUMN_NAME as FOREIGN_COLUMN
-                            FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
-                            JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-                                ON rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                            JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu2
-                                ON rc.UNIQUE_CONSTRAINT_NAME = kcu2.CONSTRAINT_NAME
-                            WHERE kcu.TABLE_NAME = @table AND kcu.TABLE_SCHEMA = @schema
-                        ) fk ON c.COLUMN_NAME = fk.COLUMN_NAME
-                        WHERE c.TABLE_NAME = @table AND c.TABLE_SCHEMA = @schema
-                        ORDER BY c.ORDINAL_POSITION
-                    `
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
 
-                    return (result.recordset || []).map(row => ({
-                        name: row.COLUMN_NAME,
-                        type: row.DATA_TYPE,
-                        nullable: row.IS_NULLABLE === 'YES',
-                        defaultValue: row.COLUMN_DEFAULT,
-                        isPrimaryKey: row.IS_PRIMARY,
-                        isUnique: false,
-                        isForeignKey: !!row.FOREIGN_TABLE,
-                        foreignSchema: row.FOREIGN_SCHEMA,
-                        foreignTable: row.FOREIGN_TABLE,
-                        foreignColumn: row.FOREIGN_COLUMN,
-                    }))
-                }
-
-                case 'clickhouse': {
-                    // ClickHouse doesn't support foreign keys, so we just return null for FK fields
-                    const client = createClickHouseConnection(connection)
-                    const result = await client.query({
-                        query: `
-                            SELECT name, type, default_expression, is_in_primary_key
-                            FROM system.columns
-                            WHERE database = {database:String} AND table = {table:String}
-                            ORDER BY position
-                        `,
-                        query_params: {
-                            database: connection.database || 'default',
-                            table: input.tableName,
-                        },
-                        format: 'JSONEachRow',
-                    })
-                    const rows = await result.json<{
+                    // First get basic column info
+                    const tableInfoResult = await sql<{
+                        cid: number
                         name: string
                         type: string
-                        default_expression: string
-                        is_in_primary_key: number
-                    }[]>()
+                        notnull: number
+                        dflt_value: string | null
+                        pk: number
+                    }>`PRAGMA table_info(${sql.raw('"' + input.tableName.replace(/"/g, '""') + '"')})`.execute(kysely)
 
-                    return rows.map(row => ({
+                    // Extract foreign keys
+                    const fkResult = await sql<{
+                        from: string
+                        table: string
+                        to: string
+                    }>`PRAGMA foreign_key_list(${sql.raw('"' + input.tableName.replace(/"/g, '""') + '"')})`.execute(kysely)
+
+                    const foreignKeys = fkResult.rows.reduce((acc, row) => {
+                        acc[row.from] = {
+                            table: row.table,
+                            column: row.to
+                        }
+                        return acc
+                    }, {} as Record<string, { table: string, column: string }>)
+
+                    // Note: SQLite unique constraints are harder to parse directly from PRAGMA, 
+                    // PRAGMA index_list combined with PRAGMA index_info is needed, but for simplicity
+                    // we'll default isUnique to false.
+
+                    return tableInfoResult.rows.map(row => ({
                         name: row.name,
-                        type: row.type,
-                        nullable: row.type.includes('Nullable'),
-                        defaultValue: row.default_expression || null,
-                        isPrimaryKey: row.is_in_primary_key === 1,
+                        type: row.type || 'TEXT',
+                        nullable: row.notnull === 0,
+                        defaultValue: row.dflt_value,
+                        isPrimaryKey: row.pk > 0,
                         isUnique: false,
-                        isForeignKey: false,
+                        isForeignKey: !!foreignKeys[row.name],
                         foreignSchema: null,
-                        foreignTable: null,
-                        foreignColumn: null,
+                        foreignTable: foreignKeys[row.name]?.table || null,
+                        foreignColumn: foreignKeys[row.name]?.column || null,
+                        indexName: null,
                     }))
                 }
 

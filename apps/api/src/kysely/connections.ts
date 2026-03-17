@@ -1,9 +1,11 @@
 import type { DatabaseType, Connection } from '../drizzle/schema/connections'
-import { Kysely, PostgresDialect, MysqlDialect } from 'kysely'
+import { Kysely, PostgresDialect, MysqlDialect, SqliteDialect } from 'kysely'
 import pg from 'pg'
 import mysql from 'mysql2'
 import mssql from 'mssql'
 import { createClient as createClickHouseClient } from '@clickhouse/client'
+import snowflake from 'snowflake-sdk'
+import { Database as BunSQLite } from 'bun:sqlite'
 
 // Generic database interface for Kysely
 export interface Database {
@@ -162,6 +164,221 @@ export function createClickHouseConnection(connection: Connection) {
 }
 
 /**
+ * Create a Snowflake connection (cached)
+ */
+export function createSnowflakeConnection(connection: Connection): snowflake.Connection {
+    const cacheKey = `snowflake:${connection.id}`
+
+    // Ensure we normalise the account formatting
+    const account = (connection.account || '').replace(/\.snowflakecomputing\.com$/, '')
+
+    if (!connectionPools.has(cacheKey)) {
+        const client = snowflake.createConnection({
+            account: account,
+            username: connection.username || '',
+            password: connection.password || '',
+            database: connection.database || undefined,
+            warehouse: connection.warehouse || undefined,
+            role: connection.role || undefined,
+        })
+        connectionPools.set(cacheKey, client)
+    }
+
+    return connectionPools.get(cacheKey) as snowflake.Connection
+}
+
+/**
+ * Create a temporary Snowflake connection for testing (not cached)
+ */
+export function createTempSnowflakeConnection(connection: Partial<Connection>): snowflake.Connection {
+    const account = (connection.account || '').replace(/\.snowflakecomputing\.com$/, '')
+    return snowflake.createConnection({
+        account: account,
+        username: connection.username || '',
+        password: connection.password || '',
+        database: connection.database || undefined,
+        warehouse: connection.warehouse || undefined,
+        role: connection.role || undefined,
+    })
+}
+
+/**
+ * Execute a Snowflake query using the SDK
+ */
+export function executeSnowflakeQuery(client: snowflake.Connection, querySql: string): Promise<unknown[]> {
+    return new Promise((resolve, reject) => {
+        // Automatically connect if not already connected
+        const exec = () => {
+            client.execute({
+                sqlText: querySql,
+                complete: (err, stmt, rows) => {
+                    if (err) {
+                        reject(err)
+                    } else {
+                        resolve(rows || [])
+                    }
+                }
+            })
+        }
+
+        if (client.isUp()) {
+            exec()
+        } else {
+            client.connect((err) => {
+                if (err) reject(err)
+                else exec()
+            })
+        }
+    })
+}
+
+/**
+ * Create a Supabase connection (reuses PostgreSQL via connection string or pooler URL)
+ * Supabase projects expose a standard PostgreSQL endpoint
+ */
+export function createSupabaseConnection(connection: Connection): Kysely<Database> {
+    const cacheKey = `supabase:${connection.id}`
+
+    const getSupabaseDb = (db?: string | null) => {
+        if (!db || db.toLowerCase() === 'supabase connection') return 'postgres'
+        return db
+    }
+
+    if (!connectionPools.has(cacheKey)) {
+        // Supabase stores its connection string in connectionString, or build from host/port/db/user/pass
+        const pool = new pg.Pool({
+            connectionString: connection.connectionString || undefined,
+            host: connection.connectionString ? undefined : (connection.host || undefined),
+            port: connection.connectionString ? undefined : (connection.port || 5432),
+            database: connection.connectionString ? undefined : getSupabaseDb(connection.database),
+            user: connection.connectionString ? undefined : (connection.username || undefined),
+            password: connection.connectionString ? undefined : (connection.password || undefined),
+            ssl: { rejectUnauthorized: false }, // Supabase always requires SSL
+            max: 10,
+            idleTimeoutMillis: 30000,
+        })
+        connectionPools.set(cacheKey, pool)
+    }
+
+    return new Kysely<Database>({
+        dialect: new PostgresDialect({
+            pool: connectionPools.get(cacheKey) as pg.Pool,
+        }),
+    })
+}
+
+/**
+ * Create a temporary Supabase connection for testing (not cached)
+ */
+export function createTempSupabaseConnection(connection: Partial<Connection>): { kysely: Kysely<Database>; pool: pg.Pool } {
+    const getSupabaseDb = (db?: string | null) => {
+        if (!db || db.toLowerCase() === 'supabase connection') return 'postgres'
+        return db
+    }
+
+    const pool = new pg.Pool({
+        connectionString: connection.connectionString || undefined,
+        host: connection.connectionString ? undefined : (connection.host || undefined),
+        port: connection.connectionString ? undefined : (connection.port || 5432),
+        database: connection.connectionString ? undefined : getSupabaseDb(connection.database),
+        user: connection.connectionString ? undefined : (connection.username || undefined),
+        password: connection.connectionString ? undefined : (connection.password || undefined),
+        ssl: { rejectUnauthorized: false },
+        max: 2,
+        idleTimeoutMillis: 5000,
+    })
+    const kysely = new Kysely<Database>({
+        dialect: new PostgresDialect({ pool }),
+    })
+    return { kysely, pool }
+}
+
+/**
+ * Create a Redshift connection (reuses PostgreSQL driver)
+ */
+export function createRedshiftConnection(connection: Connection): Kysely<Database> {
+    const cacheKey = `redshift:${connection.id}`
+
+    if (!connectionPools.has(cacheKey)) {
+        const pool = new pg.Pool({
+            host: connection.host || undefined,
+            port: connection.port || 5439, // Redshift default port
+            database: connection.database || undefined,
+            user: connection.username || undefined,
+            password: connection.password || undefined,
+            ssl: connection.ssl ? { rejectUnauthorized: false } : undefined,
+            connectionString: connection.connectionString || undefined,
+            max: 10,
+            idleTimeoutMillis: 30000,
+        })
+        connectionPools.set(cacheKey, pool)
+    }
+
+    return new Kysely<Database>({
+        dialect: new PostgresDialect({
+            pool: connectionPools.get(cacheKey) as pg.Pool,
+        }),
+    })
+}
+
+/**
+ * Create a temporary Redshift connection for testing
+ */
+export function createTempRedshiftConnection(connection: Partial<Connection>): { kysely: Kysely<Database>; pool: pg.Pool } {
+    const pool = new pg.Pool({
+        host: connection.host || undefined,
+        port: connection.port || 5439,
+        database: connection.database || undefined,
+        user: connection.username || undefined,
+        password: connection.password || undefined,
+        ssl: connection.ssl ? { rejectUnauthorized: false } : undefined,
+        connectionString: connection.connectionString || undefined,
+        max: 2,
+        idleTimeoutMillis: 5000,
+    })
+    const kysely = new Kysely<Database>({
+        dialect: new PostgresDialect({ pool }),
+    })
+    return { kysely, pool }
+}
+
+/**
+ * Create a SQLite connection
+ */
+export function createSqliteConnection(connection: Connection): Kysely<Database> {
+    const cacheKey = `sqlite:${connection.id}`
+
+    if (!connectionPools.has(cacheKey)) {
+        // For SQLite, the database name is typically the path, or connectionString can be the path
+        // Strip surrounding quotes that users may accidentally include
+        const rawPath = connection.connectionString || connection.database || ':memory:'
+        const dbPath = rawPath.replace(/^["']|["']$/g, '').trim()
+        const sqlite = new BunSQLite(dbPath)
+        connectionPools.set(cacheKey, sqlite)
+    }
+
+    return new Kysely<Database>({
+        dialect: new SqliteDialect({
+            database: connectionPools.get(cacheKey) as any,
+        }),
+    })
+}
+
+/**
+ * Create a temporary SQLite connection for testing
+ */
+export function createTempSqliteConnection(connection: Partial<Connection>): { kysely: Kysely<Database>; db: BunSQLite } {
+    // Strip surrounding quotes that users may accidentally include
+    const rawPath = connection.connectionString || connection.database || ':memory:'
+    const dbPath = rawPath.replace(/^["']|["']$/g, '').trim()
+    const db = new BunSQLite(dbPath)
+    const kysely = new Kysely<Database>({
+        dialect: new SqliteDialect({ database: db as any }),
+    })
+    return { kysely, db }
+}
+
+/**
  * Get database connection based on type (cached)
  */
 export function getConnection(connection: Connection) {
@@ -170,6 +387,12 @@ export function getConnection(connection: Connection) {
             return createPostgresConnection(connection)
         case 'mysql':
             return createMysqlConnection(connection)
+        case 'supabase':
+            return createSupabaseConnection(connection)
+        case 'redshift':
+            return createRedshiftConnection(connection)
+        case 'sqlite':
+            return createSqliteConnection(connection)
         default:
             throw new Error(`Unsupported database type: ${connection.type}`)
     }
@@ -186,6 +409,9 @@ export async function closeConnection(connectionId: string, type: DatabaseType) 
         mssql: 'mssql',
         clickhouse: 'clickhouse',
         snowflake: 'snowflake',
+        supabase: 'supabase',
+        redshift: 'redshift',
+        sqlite: 'sqlite',
     }
 
     const cacheKey = `${typeToPrefix[type] || type}:${connectionId}`
@@ -211,6 +437,25 @@ export async function closeConnection(connectionId: string, type: DatabaseType) 
                 break
             case 'clickhouse':
                 await (pool as ReturnType<typeof createClickHouseClient>).close()
+                break
+            case 'supabase':
+                await (pool as pg.Pool).end()
+                break
+            case 'redshift':
+                await (pool as pg.Pool).end()
+                break
+            case 'sqlite':
+                (pool as BunSQLite).close()
+                break
+            case 'snowflake':
+                if ((pool as snowflake.Connection).isUp()) {
+                    await new Promise<void>((resolve, reject) => {
+                        (pool as snowflake.Connection).destroy((err) => {
+                            if (err) reject(err)
+                            else resolve()
+                        })
+                    })
+                }
                 break
         }
         connectionPools.delete(cacheKey)
@@ -239,6 +484,25 @@ export async function closeAllConnections() {
                     break
                 case 'clickhouse':
                     await (pool as ReturnType<typeof createClickHouseClient>).close()
+                    break
+                case 'supabase':
+                    await (pool as pg.Pool).end()
+                    break
+                case 'redshift':
+                    await (pool as pg.Pool).end()
+                    break
+                case 'sqlite':
+                    (pool as BunSQLite).close()
+                    break
+                case 'snowflake':
+                    if ((pool as snowflake.Connection).isUp()) {
+                        await new Promise<void>((resolve, reject) => {
+                            (pool as snowflake.Connection).destroy((err) => {
+                                if (err) reject(err)
+                                else resolve()
+                            })
+                        })
+                    }
                     break
             }
         } catch (error) {

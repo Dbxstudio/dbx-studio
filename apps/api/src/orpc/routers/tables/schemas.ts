@@ -5,7 +5,12 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createSupabaseConnection,
+    createSnowflakeConnection,
+    executeSnowflakeQuery,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -31,8 +36,11 @@ export const schemas = orpc
 
         try {
             switch (connection.type) {
-                case 'postgresql': {
-                    const kysely = createPostgresConnection(connection)
+                case 'postgresql':
+                case 'supabase': {
+                    const kysely = connection.type === 'supabase'
+                        ? createSupabaseConnection(connection)
+                        : createPostgresConnection(connection)
                     const result = await sql<{ schema_name: string }>`
                         SELECT schema_name
                         FROM information_schema.schemata
@@ -96,6 +104,39 @@ export const schemas = orpc
                         name: row.schema_name,
                         tables: [],
                     }))
+                }
+
+                case 'snowflake': {
+                    const client = createSnowflakeConnection(connection)
+                    const result = await executeSnowflakeQuery(client, 'SHOW SCHEMAS')
+
+                    return (result as Array<{ name: string }>).map((row) => ({
+                        name: row.name,
+                        tables: [],
+                    }))
+                }
+
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const result = await sql<{ schema_name: string }>`
+                        SELECT schema_name 
+                        FROM information_schema.schemata 
+                        WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+                        ORDER BY schema_name
+                    `.execute(kysely)
+
+                    return result.rows.map(row => ({
+                        name: row.schema_name,
+                        tables: [],
+                    }))
+                }
+
+                case 'sqlite': {
+                    // SQLite doesn't have traditional schemas, default to 'main'
+                    return [{
+                        name: 'main',
+                        tables: [],
+                    }]
                 }
 
                 default:

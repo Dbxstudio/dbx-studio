@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { Toaster, toast } from 'sonner'
 import { Sidebar } from './features/layout'
-import { SchemaTree } from './features/schema'
+import { SchemaTree, TableProperties } from './features/schema'
 import { ConnectionModal } from './features/connections'
 import { SQLEditor } from './features/editor'
 import { ResultsPanel } from './features/results'
@@ -166,6 +166,7 @@ function AppContent() {
     const [showAIChat, setShowAIChat] = useState(false)
     const [showConnectionModal, setShowConnectionModal] = useState(false)
     const [editingConnection, setEditingConnection] = useState<any>(null) // Connection being edited
+    const [tableSubTab, setTableSubTab] = useState<'data' | 'properties'>('data')
 
     // Initialize tabs and active tab from cache
     const [tabs, setTabs] = useState<TabInfo[]>(() => {
@@ -241,6 +242,11 @@ function AppContent() {
 
     // Fetch schemas for the selected connection
     const { data: schemas } = useSchemas(selectedConnectionId)
+
+    // Reset table sub-tab when switching tabs
+    useEffect(() => {
+        setTableSubTab('data')
+    }, [activeTabId])
 
     // Auto-select first connection if worksheet has none
     useEffect(() => {
@@ -968,49 +974,62 @@ function AppContent() {
                                         </>
                                     ) : activeTab?.type === 'table' ? (
                                         <div className="table-data-section">
-                                            <DataGrid
-                                                columns={tableColumnsData?.map(c => ({
-                                                    id: c.name,
-                                                    name: c.name,
-                                                    type: c.type,
-                                                    isPrimaryKey: c.isPrimaryKey,
-                                                    isNullable: c.nullable,
-                                                    isForeignKey: c.isForeignKey,
-                                                    foreignSchema: c.foreignSchema,
-                                                    foreignTable: c.foreignTable,
-                                                    foreignColumn: c.foreignColumn,
-                                                    defaultValue: c.defaultValue,
-                                                })) || []}
-                                                data={tableDataRows}
-                                                tableName={activeTab.tableName}
-                                                schema={activeTab.schema}
-                                                loading={!tableColumnsData || isLoadingTableData}
-                                                error={tableError}
-                                                readOnly={false}
-                                                hasMore={hasNextPage}
-                                                isFetchingMore={isFetchingNextPage}
-                                                totalCount={tableTotalCount}
-                                                onLoadMore={() => {
-                                                    if (!isFetchingNextPage && hasNextPage) {
-                                                        fetchNextPage()
-                                                    }
-                                                }}
-                                                onRefresh={() => {
-                                                    refetchTableData()
-                                                }}
-                                                onCellEdit={handleCellEdit}
-                                                onRowInsert={handleRowInsert}
-                                                onRowDelete={handleRowDelete}
-                                                onForeignKeyNavigate={handleForeignKeyNavigate}
-                                                canNavigateBack={!!activeTab.history?.length}
-                                                onNavigateBack={handleNavigateBack}
-                                                onSaveSuccess={(changeCount) => {
-                                                    toast.success(`Successfully saved ${changeCount} change${changeCount > 1 ? 's' : ''}`)
-                                                }}
-                                                onSaveError={(error) => {
-                                                    toast.error(error.message || 'Failed to save changes')
-                                                }}
-                                            />
+                                            {tableSubTab === 'properties' ? (
+                                                <TableProperties
+                                                    tableName={activeTab.tableName || ''}
+                                                    schema={activeTab.schema || 'public'}
+                                                    databaseName={selectedConnection?.database}
+                                                    columns={tableColumnsData || []}
+                                                    loading={!tableColumnsData}
+                                                    onRefresh={() => refetchTableData()}
+                                                    onBackToData={() => setTableSubTab('data')}
+                                                />
+                                            ) : (
+                                                <DataGrid
+                                                    columns={tableColumnsData?.map(c => ({
+                                                        id: c.name,
+                                                        name: c.name,
+                                                        type: c.type,
+                                                        isPrimaryKey: c.isPrimaryKey,
+                                                        isNullable: c.nullable,
+                                                        isForeignKey: c.isForeignKey,
+                                                        foreignSchema: c.foreignSchema,
+                                                        foreignTable: c.foreignTable,
+                                                        foreignColumn: c.foreignColumn,
+                                                        defaultValue: c.defaultValue,
+                                                    })) || []}
+                                                    data={tableDataRows}
+                                                    tableName={activeTab.tableName}
+                                                    schema={activeTab.schema}
+                                                    loading={!tableColumnsData || isLoadingTableData}
+                                                    error={tableError}
+                                                    readOnly={false}
+                                                    hasMore={hasNextPage}
+                                                    isFetchingMore={isFetchingNextPage}
+                                                    totalCount={tableTotalCount}
+                                                    onLoadMore={() => {
+                                                        if (!isFetchingNextPage && hasNextPage) {
+                                                            fetchNextPage()
+                                                        }
+                                                    }}
+                                                    onRefresh={() => {
+                                                        refetchTableData()
+                                                    }}
+                                                    onCellEdit={handleCellEdit}
+                                                    onRowInsert={handleRowInsert}
+                                                    onRowDelete={handleRowDelete}
+                                                    onForeignKeyNavigate={handleForeignKeyNavigate}
+                                                    canNavigateBack={!!activeTab.history?.length}
+                                                    onNavigateBack={handleNavigateBack}
+                                                    onShowProperties={() => setTableSubTab('properties')}
+                                                    onSaveSuccess={(changeCount) => {
+                                                        toast.success(`Successfully saved ${changeCount} change${changeCount > 1 ? 's' : ''}`)
+                                                    }}
+                                                    onSaveError={(error) => {
+                                                        toast.error(error.message || 'Failed to save changes')
+                                                    }}
+                                                />
+                                            )}
                                         </div>
                                     ) : null}
                                 </div>

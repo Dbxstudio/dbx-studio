@@ -11,6 +11,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow-y: auto;
+    padding: 24px;
     z-index: 10000;
 }
 
@@ -33,6 +35,8 @@
 .connection-type-selector {
     min-width: 500px;
     max-width: 600px;
+    max-height: min(80vh, 720px);
+    overflow-y: auto;
 }
 
 .connection-modal {
@@ -164,6 +168,14 @@
     color: #29B5E8;
 }
 
+.connection-type-icon.supabase {
+    color: #3ECF8E;
+}
+
+.connection-type-icon.redshift {
+    color: #FF9900;
+}
+
 .connection-type-icon.mariadb {
     color: #C0765A;
 }
@@ -171,6 +183,10 @@
 /* PostgreSQL icon in modal header */
 .postgres {
     color: #5D9CEC;
+}
+
+.redshift {
+    color: #FF9900;
 }
 
 .connection-type-icon-wrapper {
@@ -499,7 +515,15 @@
     width: 8px;
 }
 
+.connection-type-selector::-webkit-scrollbar {
+    width: 8px;
+}
+
 .connection-modal::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+.connection-type-selector::-webkit-scrollbar-track {
     background: #2a2a2a;
 }
 
@@ -508,8 +532,41 @@
     border-radius: 4px;
 }
 
+.connection-type-selector::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
 .connection-modal::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+.connection-type-selector::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.connection-modal,
+.connection-type-selector {
+    background-color: #ffffff;
+    color: #111827;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+}
+
+.connection-type-selector:not(.dark-theme) .modal-header,
+.connection-modal:not(.dark-theme) .modal-header,
+.connection-modal:not(.dark-theme) .modal-actions {
+    border-color: #e5e7eb;
+}
+
+.connection-type-selector:not(.dark-theme) .close-btn,
+.connection-modal:not(.dark-theme) .close-btn {
+    color: #374151;
+}
+
+.connection-type-selector:not(.dark-theme) .close-btn:hover,
+.connection-modal:not(.dark-theme) .close-btn:hover {
+    background-color: rgba(17, 24, 39, 0.08);
 }
 
 /* Spin Animation */
@@ -533,10 +590,68 @@
     .connection-type-selector,
     .connection-modal {
         min-width: 90vw !important;
-        margin: 20px;
+        max-height: calc(100vh - 40px);
+        margin: 0;
     }
 
     .connection-type-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Supabase Styles */
+.supabase-info-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background-color: rgba(62, 207, 142, 0.08);
+    border: 1px solid rgba(62, 207, 142, 0.25);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #a3cfb8;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.method-tabs {
+    display: flex;
+    gap: 0;
+    border: 1px solid #444;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.method-tab {
+    flex: 1;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: #999;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.method-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+}
+
+.method-tab.active {
+    background: #3ECF8E;
+    color: #0a0a0a;
+    font-weight: 600;
+}
+
+.supabase-btn {
+    background-color: #3ECF8E !important;
+    border-color: #2db97a !important;
+    color: #0a0a0a !important;
+}
+
+.supabase-btn:hover:not(:disabled) {
+    background-color: #2db97a !important;
+    transform: translateY(-1px);
 }

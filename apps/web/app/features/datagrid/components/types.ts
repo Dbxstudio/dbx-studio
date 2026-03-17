@@ -111,6 +111,8 @@ export interface DataGridProps {
     // Filter/Sort callbacks for server-side operations
     onFilterChange?: (filters: ActiveFilter[]) => void
     onSortChange?: (orderBy: SortOrder) => void
+    // Properties tab
+    onShowProperties?: () => void
 }
 
 // Filter definitions

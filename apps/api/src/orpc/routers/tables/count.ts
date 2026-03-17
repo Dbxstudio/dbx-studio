@@ -5,7 +5,9 @@ import {
     createPostgresConnection,
     createMysqlConnection,
     createMssqlConnection,
-    createClickHouseConnection
+    createClickHouseConnection,
+    createRedshiftConnection,
+    createSqliteConnection,
 } from '~/kysely/connections'
 import { sql } from 'kysely'
 
@@ -47,7 +49,9 @@ export const count = orpc
 
                 case 'mysql': {
                     const kysely = createMysqlConnection(connection)
-                    const database = connection.database || 'mysql'
+                    const database = input.schema === 'public'
+                        ? connection.database || 'mysql'
+                        : input.schema
                     const fullTableName = `\`${database}\`.\`${input.tableName}\``
 
                     const countResult = await sql<{ count: number }>`
@@ -76,8 +80,32 @@ export const count = orpc
                         query: `SELECT COUNT(*) as count FROM ${connection.database || 'default'}.${input.tableName}`,
                         format: 'JSONEachRow',
                     })
-                    const countRows = await countResult.json<{ count: string }[]>()
+                    const countRows = await countResult.json() as any[]
                     const total = parseInt(countRows[0]?.count || '0', 10)
+
+                    return { count: total }
+                }
+
+                case 'redshift': {
+                    const kysely = createRedshiftConnection(connection)
+                    const fullTableName = `"${input.schema}"."${input.tableName}"`
+
+                    const countResult = await sql<{ count: string }>`
+                        SELECT COUNT(*) as count FROM ${sql.raw(fullTableName)}
+                    `.execute(kysely)
+                    const total = parseInt(countResult.rows[0]?.count || '0', 10)
+
+                    return { count: total }
+                }
+
+                case 'sqlite': {
+                    const kysely = createSqliteConnection(connection)
+                    const fullTableName = `"${input.tableName}"`
+
+                    const countResult = await sql<{ count: number }>`
+                        SELECT COUNT(*) as count FROM ${sql.raw(fullTableName)}
+                    `.execute(kysely)
+                    const total = Number(countResult.rows[0]?.count || 0)
 
                     return { count: total }
                 }

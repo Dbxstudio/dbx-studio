@@ -19,6 +19,7 @@ export interface ColumnInfo {
     foreignSchema?: string | null
     foreignTable?: string | null
     foreignColumn?: string | null
+    indexName?: string | null
 }
 
 export interface TableData {

@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Send, Settings2, Loader2 } from 'lucide-react'
+import { Clock3, Send, Settings2, Loader2 } from 'lucide-react'
+import { useRecentQueries } from '../hooks/useRecentQueries'
 
 interface ChatInputProps {
     onSendMessage: (message: string) => void
@@ -20,7 +21,10 @@ export function ChatInput({
     disabled = false
 }: ChatInputProps) {
     const [message, setMessage] = useState('')
+    const [isRecentOpen, setIsRecentOpen] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+    const { recentQueries, addRecentQuery } = useRecentQueries()
 
     // Auto-resize textarea
     useEffect(() => {
@@ -30,11 +34,35 @@ export function ChatInput({
         }
     }, [message])
 
+    useEffect(() => {
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!containerRef.current?.contains(event.target as Node)) {
+                setIsRecentOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handlePointerDown)
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown)
+        }
+    }, [])
+
     const handleSend = () => {
         if (message.trim() && !isLoading && !disabled) {
-            onSendMessage(message.trim())
+            const nextMessage = message.trim()
+
+            addRecentQuery(nextMessage)
+            onSendMessage(nextMessage)
             setMessage('')
+            setIsRecentOpen(false)
         }
+    }
+
+    const handleRecentSelect = (query: string) => {
+        setMessage(query)
+        setIsRecentOpen(false)
+        requestAnimationFrame(() => textareaRef.current?.focus())
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -45,17 +73,46 @@ export function ChatInput({
     }
 
     return (
-        <div className="chat-input-container">
+        <div ref={containerRef} className="chat-input-container">
+            <button
+                type="button"
+                className="recent-queries-toggle"
+                onClick={() => setIsRecentOpen((current) => !current)}
+                disabled={disabled}
+                title="Recent queries"
+            >
+                <Clock3 size={18} />
+            </button>
             <textarea
                 ref={textareaRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onFocus={() => {
+                    if (recentQueries.length > 0) {
+                        setIsRecentOpen(true)
+                    }
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
                 disabled={isLoading || disabled}
                 className="chat-input"
                 rows={1}
             />
+            {isRecentOpen && recentQueries.length > 0 && (
+                <div className="recent-queries-dropdown">
+                    <div className="recent-queries-title">Recent Queries</div>
+                    {recentQueries.map((query) => (
+                        <button
+                            key={query}
+                            type="button"
+                            className="recent-query-item"
+                            onClick={() => handleRecentSelect(query)}
+                        >
+                            {query}
+                        </button>
+                    ))}
+                </div>
+            )}
             <button
                 onClick={handleSend}
                 disabled={!message.trim() || isLoading || disabled}

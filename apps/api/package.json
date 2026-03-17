@@ -22,6 +22,7 @@
         "@orpc/server": "^1.13.0",
         "@smithy/node-http-handler": "^4.4.9",
         "arktype": "^2.1.29",
+
         "consola": "^3.4.2",
         "drizzle-orm": "^0.45.1",
         "drizzle-zod": "^0.5.1",
@@ -32,7 +33,9 @@
         "nanoid": "^5.1.6",
         "pg": "^8.16.3",
         "pg-hstore": "^2.3.4",
+        "postgres": "^3.4.8",
         "sequelize": "^6.37.7",
+        "snowflake-sdk": "^2.3.4",
         "sqlite3": "^5.1.7",
         "uuid": "^13.0.0",
         "zod": "^3.24.0"
