@@ -12,6 +12,7 @@ import {
     createRedshiftConnection,
     createSqliteConnection,
 } from '~/kysely/connections'
+import { bigQueryQuery, createBigQueryConnection, resolveBigQueryConfig } from '~/kysely/bigquery'
 import { sql } from 'kysely'
 
 const executeQuerySchema = z.object({
@@ -99,6 +100,24 @@ export const execute = orpc
                     const kysely = createSqliteConnection(connection)
                     const result = await sql.raw(input.sql).execute(kysely)
                     rows = result.rows as unknown[]
+                    break
+                }
+
+                case 'bigquery': {
+                    const bqConfig = resolveBigQueryConfig(connection)
+                    if (!bqConfig) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery connection requires projectId and keyFilename',
+                        })
+                    }
+
+                    const client = createBigQueryConnection({
+                        connectionId: connection.id,
+                        projectId: bqConfig.projectId,
+                        keyFilename: bqConfig.keyFilename,
+                        dataset: bqConfig.dataset,
+                    })
+                    rows = await bigQueryQuery(client, input.sql, connection.dataset || bqConfig.dataset)
                     break
                 }
 

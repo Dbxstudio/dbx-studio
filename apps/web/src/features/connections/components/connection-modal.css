@@ -176,6 +176,10 @@
     color: #FF9900;
 }
 
+.connection-type-icon.bigquery {
+    color: #3B82F6;
+}
+
 .connection-type-icon.mariadb {
     color: #C0765A;
 }
@@ -187,6 +191,10 @@
 
 .redshift {
     color: #FF9900;
+}
+
+.bigquery {
+    color: #3B82F6;
 }
 
 .connection-type-icon-wrapper {

@@ -1,10 +1,10 @@
 import { FaTimes, FaDatabase } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSnowflake, SiSqlite, SiSupabase, SiAmazonredshift } from 'react-icons/si'
+import { SiSnowflake, SiSqlite, SiSupabase, SiAmazonredshift, SiGooglebigquery } from 'react-icons/si'
 import './connection-modal.css'
 
-export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase' | 'redshift'
+export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase' | 'redshift' | 'bigquery'
 
 interface ConnectionTypeConfig {
     type: ConnectionType
@@ -44,6 +44,12 @@ const connectionTypes: ConnectionTypeConfig[] = [
         name: 'SQLite',
         icon: <SiSqlite size={40} className="connection-type-icon sqlite" />,
         description: 'Connect to SQLite databases',
+    },
+    {
+        type: 'bigquery',
+        name: 'BigQuery',
+        icon: <SiGooglebigquery size={40} className="connection-type-icon bigquery" />,
+        description: 'Connect to Google BigQuery',
     },
     {
         type: 'redshift',

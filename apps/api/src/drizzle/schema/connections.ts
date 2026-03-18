@@ -3,7 +3,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { nanoid } from 'nanoid'
 
 // Database type enum values
-export const databaseTypes = ['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite'] as const
+export const databaseTypes = ['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite', 'bigquery'] as const
 export type DatabaseType = typeof databaseTypes[number]
 
 // Base ID generator
@@ -38,6 +38,11 @@ export const connections = pgTable('connections', {
 
     // ClickHouse specific
     protocol: text('protocol'), // http or https
+
+    // BigQuery specific
+    projectId: text('project_id'),
+    keyFilename: text('key_filename'),
+    dataset: text('dataset'),
 
     // Connection string (alternative to individual fields)
     connectionString: text('connection_string'),

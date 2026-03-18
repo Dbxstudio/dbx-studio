@@ -14,6 +14,7 @@ import { initializeDatabase } from './drizzle'
 // Import routes
 import { healthRoutes } from './routes/health'
 import { aiStreamRoutes } from './routes/ai-stream'
+import { bigQueryRoutes } from './routes/bigquery'
 import { createContext } from './orpc/context'
 import { router } from './orpc/routers'
 
@@ -91,6 +92,9 @@ app.route('/health', healthRoutes)
 // Mount AI streaming routes
 app.route('/ai', aiStreamRoutes)
 
+// Mount BigQuery v1 routes
+app.route('/v1/bigquery', bigQueryRoutes)
+
 // Mount oRPC handler
 app.use('/rpc/*', async (c, next) => {
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
@@ -115,6 +119,7 @@ app.get('/', (c) => {
         endpoints: {
             health: '/api/health',
             rpc: '/api/rpc',
+            bigqueryTestConnection: '/api/v1/bigquery/test-connection',
         },
     })
 })

@@ -12,6 +12,7 @@ import {
     createRedshiftConnection,
     createSqliteConnection,
 } from '~/kysely/connections'
+import { bigQueryQuery, createBigQueryConnection, resolveBigQueryConfig } from '~/kysely/bigquery'
 import { sql } from 'kysely'
 
 const getColumnsSchema = z.object({
@@ -32,6 +33,15 @@ interface ColumnInfo {
     foreignTable: string | null
     foreignColumn: string | null
     indexName: string | null
+}
+
+function assertBigQueryIdentifier(name: string, kind: 'dataset' | 'table'): string {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+        throw new ORPCError('BAD_REQUEST', {
+            message: `Invalid BigQuery ${kind} identifier: ${name}`,
+        })
+    }
+    return name
 }
 
 /**
@@ -521,6 +531,55 @@ export const columns = orpc
                         foreignSchema: null,
                         foreignTable: foreignKeys[row.name]?.table || null,
                         foreignColumn: foreignKeys[row.name]?.column || null,
+                        indexName: null,
+                    }))
+                }
+
+                case 'bigquery': {
+                    const bqConfig = resolveBigQueryConfig(connection)
+                    if (!bqConfig) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery connection requires projectId and keyFilename',
+                        })
+                    }
+
+                    const dataset = assertBigQueryIdentifier(
+                        input.schema === 'public' ? (connection.dataset || '') : input.schema,
+                        'dataset',
+                    )
+                    const tableName = assertBigQueryIdentifier(input.tableName, 'table')
+
+                    const client = createBigQueryConnection({
+                        connectionId: connection.id,
+                        projectId: bqConfig.projectId,
+                        keyFilename: bqConfig.keyFilename,
+                        dataset: bqConfig.dataset,
+                    })
+
+                    const rows = await bigQueryQuery(
+                        client,
+                        `SELECT
+                            column_name,
+                            data_type,
+                            is_nullable,
+                            column_default
+                        FROM \`${dataset}.INFORMATION_SCHEMA.COLUMNS\`
+                        WHERE table_name = '${tableName.replace(/'/g, "''")}'
+                        ORDER BY ordinal_position`,
+                        dataset,
+                    )
+
+                    return rows.map((row: any) => ({
+                        name: String(row.column_name || ''),
+                        type: String(row.data_type || 'STRING'),
+                        nullable: String(row.is_nullable || 'YES') === 'YES',
+                        defaultValue: row.column_default ? String(row.column_default) : null,
+                        isPrimaryKey: false,
+                        isUnique: false,
+                        isForeignKey: false,
+                        foreignSchema: null,
+                        foreignTable: null,
+                        foreignColumn: null,
                         indexName: null,
                     }))
                 }

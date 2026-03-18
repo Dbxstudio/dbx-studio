@@ -6,6 +6,7 @@ import mssql from 'mssql'
 import { createClient as createClickHouseClient } from '@clickhouse/client'
 import snowflake from 'snowflake-sdk'
 import { Database as BunSQLite } from 'bun:sqlite'
+import { closeAllBigQueryConnections, closeBigQueryConnection } from './bigquery'
 
 // Generic database interface for Kysely
 export interface Database {
@@ -393,6 +394,8 @@ export function getConnection(connection: Connection) {
             return createRedshiftConnection(connection)
         case 'sqlite':
             return createSqliteConnection(connection)
+        case 'bigquery':
+            throw new Error('BigQuery uses a dedicated client, not Kysely')
         default:
             throw new Error(`Unsupported database type: ${connection.type}`)
     }
@@ -412,6 +415,7 @@ export async function closeConnection(connectionId: string, type: DatabaseType) 
         supabase: 'supabase',
         redshift: 'redshift',
         sqlite: 'sqlite',
+        bigquery: 'bigquery',
     }
 
     const cacheKey = `${typeToPrefix[type] || type}:${connectionId}`
@@ -456,6 +460,9 @@ export async function closeConnection(connectionId: string, type: DatabaseType) 
                         })
                     })
                 }
+                break
+            case 'bigquery':
+                await closeBigQueryConnection(connectionId)
                 break
         }
         connectionPools.delete(cacheKey)
@@ -504,10 +511,14 @@ export async function closeAllConnections() {
                         })
                     }
                     break
+                case 'bigquery':
+                    // BigQuery SDK has no explicit close call; cache clear is enough.
+                    break
             }
         } catch (error) {
             console.error(`Error closing connection ${key}:`, error)
         }
     }
     connectionPools.clear()
+    await closeAllBigQueryConnections()
 }

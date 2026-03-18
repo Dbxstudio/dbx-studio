@@ -20,11 +20,12 @@ import {
     createSqliteConnection,
     createTempSqliteConnection,
 } from '~/kysely/connections'
+import { bigQueryConnect, createBigQueryConnection, createTempBigQueryConnection, resolveBigQueryConfig } from '~/kysely/bigquery'
 
 const testConnectionSchema = z.object({
     id: z.string().optional(),
     // Allow testing with connection details directly
-    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite']).optional(),
+    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite', 'bigquery']).optional(),
     host: z.string().optional(),
     port: z.number().optional(),
     database: z.string().optional(),
@@ -36,6 +37,9 @@ const testConnectionSchema = z.object({
     warehouse: z.string().optional(),
     role: z.string().optional(),
     protocol: z.string().optional(),
+    projectId: z.string().optional(),
+    keyFilename: z.string().optional(),
+    dataset: z.string().optional(),
 })
 
 /**
@@ -184,6 +188,33 @@ export const test = orpc
                         } finally {
                             sqliteDb.close()
                         }
+                    }
+                    break
+                }
+
+                case 'bigquery': {
+                    const bqConfig = resolveBigQueryConfig(connectionConfig)
+                    if (!bqConfig) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery requires projectId and keyFilename',
+                        })
+                    }
+
+                    if (isExistingConnection) {
+                        const client = createBigQueryConnection({
+                            connectionId: (connectionConfig as any).id,
+                            projectId: bqConfig.projectId,
+                            keyFilename: bqConfig.keyFilename,
+                            dataset: bqConfig.dataset,
+                        })
+                        await bigQueryConnect(client)
+                    } else {
+                        const client = createTempBigQueryConnection({
+                            projectId: bqConfig.projectId,
+                            keyFilename: bqConfig.keyFilename,
+                            dataset: bqConfig.dataset,
+                        })
+                        await bigQueryConnect(client)
                     }
                     break
                 }

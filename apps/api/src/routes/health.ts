@@ -27,6 +27,7 @@ healthRoutes.get('/details', (c) => {
             mssql: true,
             clickhouse: true,
             snowflake: true,
+            bigquery: true,
         },
     })
 })

@@ -2,9 +2,15 @@ import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 
 // API base URL
-// In production (Vercel), use the same domain. In development, use localhost
+// In production web deployments, same-origin is fine.
+// In desktop/file:// contexts, same-origin is not an HTTP API host, so fallback to localhost.
+const runtimeOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+const isHttpOrigin = /^https?:\/\//.test(runtimeOrigin)
+
 const API_URL = import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD ? window.location.origin : 'http://localhost:3002')
+    (import.meta.env.PROD
+        ? (isHttpOrigin ? runtimeOrigin : 'http://localhost:3002')
+        : 'http://localhost:3002')
 
 // Create the oRPC link with correct path format
 const link = new RPCLink({

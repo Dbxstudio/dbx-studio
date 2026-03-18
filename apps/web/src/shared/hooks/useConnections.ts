@@ -1,14 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../services/api'
+import { api, API_URL } from '../services/api'
 import { toast } from 'sonner'
 import { authenticatedFetch } from '../utils/authTokenManager'
 import { MAIN_SERVER_ENDPOINT } from '../constants/serverConfig'
+import { buildConnectionString } from '../utils/connectionString'
 
 // Types
 export interface Connection {
     id: string
     name: string
-    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake' | 'supabase' | 'redshift' | 'sqlite'
+    type: 'postgresql' | 'mysql' | 'mssql' | 'clickhouse' | 'snowflake' | 'supabase' | 'redshift' | 'sqlite' | 'bigquery'
     userId?: string
     host?: string
     port?: number
@@ -18,6 +19,10 @@ export interface Connection {
     account?: string
     warehouse?: string
     role?: string
+    projectId?: string
+    keyFilename?: string
+    dataset?: string
+    connectionString?: string
     label?: string
     color?: string
     lastConnectedAt?: Date | null
@@ -40,6 +45,9 @@ export interface CreateConnectionInput {
     account?: string
     warehouse?: string
     role?: string
+    projectId?: string
+    keyFilename?: string
+    dataset?: string
     label?: string
     color?: string
     connectionString?: string
@@ -81,47 +89,6 @@ function getServerRegistrationConfig(input: ConnectionMutationInput) {
             requireServerRegistration: requireServerRegistration ?? false,
             serverDriver,
         },
-    }
-}
-
-function buildConnectionString(input: Omit<CreateConnectionInput, 'showAllDatabases' | 'requireServerRegistration' | 'serverDriver'>) {
-    const username = encodeURIComponent(input.username || '')
-    const password = encodeURIComponent(input.password || '')
-    const host = input.host || 'localhost'
-    const port = input.port || 5432
-    const database = input.database || ''
-
-    let driver: string = input.type
-    let connectionString = ''
-
-    if (input.type === 'postgresql') {
-        driver = 'postgres'
-        connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-    } else if (input.type === 'mysql') {
-        connectionString = `mysql+asyncmy://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-    } else if (input.type === 'snowflake') {
-        const account = input.account || ''
-        connectionString = `snowflake://${username}:${password}@${account}${database ? '/' + database : ''}`
-    } else if (input.type === 'supabase') {
-        driver = 'postgres'
-        if (input.connectionString) {
-            connectionString = input.connectionString
-        } else {
-            connectionString = `postgresql+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-        }
-    } else if (input.type === 'redshift') {
-        driver = 'redshift'
-        connectionString = `redshift+asyncpg://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-    } else if (input.type === 'sqlite') {
-        driver = 'sqlite'
-        connectionString = `sqlite+aiosqlite:///${database}`
-    } else {
-        connectionString = `${driver}://${username}:${password}@${host}:${port}${database ? '/' + database : ''}`
-    }
-
-    return {
-        connectionString,
-        driver,
     }
 }
 
@@ -273,6 +240,9 @@ export function useUpdateConnection() {
                 account: localInput.account ?? connection.account,
                 warehouse: localInput.warehouse ?? connection.warehouse,
                 role: localInput.role ?? connection.role,
+                projectId: localInput.projectId ?? connection.projectId,
+                keyFilename: localInput.keyFilename ?? connection.keyFilename,
+                dataset: localInput.dataset ?? connection.dataset,
                 label: localInput.label ?? connection.label,
                 color: localInput.color ?? connection.color,
                 connectionString: localInput.connectionString ?? connection.connectionString,
@@ -325,6 +295,59 @@ export function useDeleteConnection() {
 export function useTestConnection() {
     return useMutation({
         mutationFn: async (input: { id?: string } & Partial<CreateConnectionInput>) => {
+            if (input.type === 'bigquery') {
+                const token = localStorage.getItem('dbx_auth_token')
+                const base = API_URL.replace(/\/$/, '')
+                const candidateUrls = Array.from(
+                    new Set([
+                        '/api/v1/bigquery/test-connection',
+                        `${base}/api/v1/bigquery/test-connection`,
+                        `${base}/v1/bigquery/test-connection`,
+                        'http://localhost:3002/api/v1/bigquery/test-connection',
+                        'http://127.0.0.1:3002/api/v1/bigquery/test-connection',
+                        ...(base.endsWith('/api') ? [`${base.replace(/\/api$/, '')}/api/v1/bigquery/test-connection`] : []),
+                    ]),
+                )
+
+                let lastError = 'BigQuery connection failed'
+
+                for (const url of candidateUrls) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                            body: JSON.stringify({
+                                projectId: input.projectId,
+                                keyFilename: input.keyFilename,
+                                dataset: input.dataset || undefined,
+                            }),
+                        })
+
+                        const data = await response.json().catch(() => ({}))
+
+                        if (response.ok) {
+                            return data as { success: boolean; message: string; latency: number }
+                        }
+
+                        lastError = data?.error || data?.message || `Request failed with status ${response.status}`
+
+                        // Try the next candidate only for route mismatch.
+                        if (response.status !== 404) {
+                            throw new Error(lastError)
+                        }
+                    } catch (error) {
+                        lastError = error instanceof Error ? error.message : 'Network error while testing BigQuery connection'
+                        // Continue to next candidate URL when fetch throws.
+                        continue
+                    }
+                }
+
+                throw new Error(lastError)
+            }
+
             const result = await api.connections.test(input)
             return extractData<{ success: boolean; message: string; latency: number }>(result)
         },

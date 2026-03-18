@@ -283,6 +283,10 @@
     color: #FFCC00;
 }
 
+.db-icon.bigquery {
+    color: #3B82F6;
+}
+
 .db-icon.default {
     color: #888;
 }

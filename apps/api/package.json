@@ -18,11 +18,11 @@
         "@aws-sdk/client-bedrock-runtime": "^3.966.0",
         "@clickhouse/client": "^1.15.0",
         "@electric-sql/pglite": "^0.2.14",
+        "@google-cloud/bigquery": "^8.1.1",
         "@hono/zod-validator": "^0.4.0",
         "@orpc/server": "^1.13.0",
         "@smithy/node-http-handler": "^4.4.9",
         "arktype": "^2.1.29",
-
         "consola": "^3.4.2",
         "drizzle-orm": "^0.45.1",
         "drizzle-zod": "^0.5.1",

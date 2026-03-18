@@ -12,6 +12,7 @@ import {
     createRedshiftConnection,
     createSqliteConnection,
 } from '~/kysely/connections'
+import { bigQueryQuery, createBigQueryConnection, resolveBigQueryConfig } from '~/kysely/bigquery'
 import { sql } from 'kysely'
 
 const filterSchema = z.object({
@@ -72,6 +73,65 @@ function buildPostgresWhereClause(filters?: z.infer<typeof filterSchema>[]): str
                 return `${column} IS NOT NULL`
             case 'BETWEEN':
                 return `${column} BETWEEN '${String(filter.values[0]).replace(/'/g, "''")}' AND '${String(filter.values[1]).replace(/'/g, "''")}' `
+            default:
+                return '1=1'
+        }
+    })
+
+    return 'WHERE ' + conditions.join(' AND ')
+}
+
+function quoteBigQueryIdentifier(identifier: string): string {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+        throw new ORPCError('BAD_REQUEST', {
+            message: `Invalid BigQuery identifier: ${identifier}`,
+        })
+    }
+    return `\`${identifier}\``
+}
+
+function buildBigQueryWhereClause(filters?: z.infer<typeof filterSchema>[]): string {
+    if (!filters || filters.length === 0) return ''
+
+    const conditions = filters.map(filter => {
+        const column = quoteBigQueryIdentifier(filter.column)
+        const value = filter.values[0]
+
+        switch (filter.operator) {
+            case '=':
+                return `${column} = '${String(value).replace(/'/g, "''")}'`
+            case '!=':
+                return `${column} != '${String(value).replace(/'/g, "''")}'`
+            case '>':
+                return `${column} > '${String(value).replace(/'/g, "''")}'`
+            case '>=':
+                return `${column} >= '${String(value).replace(/'/g, "''")}'`
+            case '<':
+                return `${column} < '${String(value).replace(/'/g, "''")}'`
+            case '<=':
+                return `${column} <= '${String(value).replace(/'/g, "''")}'`
+            case 'LIKE':
+                return `${column} LIKE '${String(value).replace(/'/g, "''")}'`
+            case 'NOT LIKE':
+                return `${column} NOT LIKE '${String(value).replace(/'/g, "''")}'`
+            case 'ILIKE':
+                return `LOWER(CAST(${column} AS STRING)) LIKE LOWER('${String(value).replace(/'/g, "''")}')`
+            case 'NOT ILIKE':
+                return `LOWER(CAST(${column} AS STRING)) NOT LIKE LOWER('${String(value).replace(/'/g, "''")}')`
+            case 'IN': {
+                const inValues = filter.values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(', ')
+                return `${column} IN (${inValues})`
+            }
+            case 'NOT IN': {
+                const notInValues = filter.values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(', ')
+                return `${column} NOT IN (${notInValues})`
+            }
+            case 'IS NULL':
+                return `${column} IS NULL`
+            case 'IS NOT NULL':
+                return `${column} IS NOT NULL`
+            case 'BETWEEN':
+                return `${column} BETWEEN '${String(filter.values[0]).replace(/'/g, "''")}' AND '${String(filter.values[1]).replace(/'/g, "''")}'`
             default:
                 return '1=1'
         }
@@ -318,6 +378,60 @@ export const data = orpc
 
                     return {
                         rows: dataResult.rows,
+                        total,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        totalPages: Math.ceil(total / input.pageSize),
+                    }
+                }
+
+                case 'bigquery': {
+                    const bqConfig = resolveBigQueryConfig(connection)
+                    if (!bqConfig) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery connection requires projectId and keyFilename',
+                        })
+                    }
+
+                    const dataset = input.schema === 'public'
+                        ? (connection.dataset || '')
+                        : input.schema
+
+                    if (!dataset) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery dataset is required. Set dataset on the connection or choose a schema.',
+                        })
+                    }
+
+                    const client = createBigQueryConnection({
+                        connectionId: connection.id,
+                        projectId: bqConfig.projectId,
+                        keyFilename: bqConfig.keyFilename,
+                        dataset: bqConfig.dataset,
+                    })
+
+                    const quotedTable = `${quoteBigQueryIdentifier(bqConfig.projectId)}.${quoteBigQueryIdentifier(dataset)}.${quoteBigQueryIdentifier(input.tableName)}`
+                    const whereClause = buildBigQueryWhereClause(input.filters)
+
+                    const countRows = await bigQueryQuery(
+                        client,
+                        `SELECT COUNT(*) AS count FROM ${quotedTable} ${whereClause}`,
+                        dataset,
+                    )
+                    const total = Number((countRows[0] as any)?.count || 0)
+
+                    const orderClause = input.orderBy
+                        ? `ORDER BY ${quoteBigQueryIdentifier(input.orderBy)} ${input.orderDirection?.toUpperCase() || 'ASC'}`
+                        : ''
+
+                    const rows = await bigQueryQuery(
+                        client,
+                        `SELECT * FROM ${quotedTable} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`,
+                        dataset,
+                    )
+
+                    return {
+                        rows,
                         total,
                         page: input.page,
                         pageSize: input.pageSize,
