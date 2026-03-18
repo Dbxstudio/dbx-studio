@@ -84,14 +84,36 @@ body {
 /* Right Panel - AI Chat */
 .query-right {
   width: 360px;
-  min-width: 280px;
-  max-width: 500px;
+  min-width: 300px;
+  max-width: 700px;
   height: 100%;
   background: #181818;
   border-left: 1px solid #2a2a2a;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+}
+
+/* Resize Handle - Left Edge of Chat Panel */
+.chat-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background-color 0.15s ease;
+}
+
+.chat-resize-handle:hover {
+  background: #4a9eff;
+}
+
+.chat-resize-handle:active {
+  background: #4a9eff;
 }
 
 /* Workspace Tabs */
