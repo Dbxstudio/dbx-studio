@@ -192,6 +192,7 @@ function AppContent() {
     const [queryColumns, setQueryColumns] = useState<{ name: string; type?: string }[]>([])
     const [queryError, setQueryError] = useState<string | null>(null)
     const [executionTime, setExecutionTime] = useState<number | undefined>(undefined)
+    const [aiChatPrefill, setAiChatPrefill] = useState<{ id: number; text: string } | null>(null)
 
     // API data - filter connections by user_id
     const { data: connectionsData } = useConnections(user?.user_id)
@@ -874,6 +875,32 @@ function AppContent() {
             }))
     }, [tabs])
 
+    const handleFixQueryInChat = useCallback(() => {
+        if (!activeTab?.sql || !queryError) {
+            return
+        }
+
+        const contextLines = [
+            'Fix this SQL error:',
+            `Query: ${activeTab.sql.trim()}`,
+            `Error: ${queryError}`,
+        ]
+
+        if (selectedConnection?.database) {
+            contextLines.push(`Database: ${selectedConnection.database}`)
+        }
+
+        if (activeTab.schema) {
+            contextLines.push(`Schema: ${activeTab.schema}`)
+        }
+
+        setAiChatPrefill({
+            id: Date.now(),
+            text: contextLines.join('\n'),
+        })
+        setShowAIChat(true)
+    }, [activeTab?.sql, activeTab?.schema, queryError, selectedConnection?.database])
+
     return (
         <div className="query-main-container">
             <div className="query-main-body">
@@ -969,6 +996,7 @@ function AppContent() {
                                                     loading={isQueryRunning}
                                                     error={queryError}
                                                     executionTime={executionTime}
+                                                    onFixInChat={queryError ? handleFixQueryInChat : undefined}
                                                 />
                                             </div>
                                         </>
@@ -1041,6 +1069,7 @@ function AppContent() {
                                     <AIChat
                                         isOpen={showAIChat}
                                         onClose={() => setShowAIChat(false)}
+                                        prefillPrompt={aiChatPrefill}
                                         connectionId={selectedConnectionId}
                                         externalConnectionId={selectedConnection?.externalConnectionId}
                                         schema={activeTab?.schema}

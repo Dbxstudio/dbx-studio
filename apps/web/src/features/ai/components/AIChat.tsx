@@ -15,6 +15,10 @@ interface AIChatProps {
     isOpen: boolean
     onClose: () => void
     onRunQuery?: (sql: string) => void
+    prefillPrompt?: {
+        id: number
+        text: string
+    } | null
     connectionId?: string
     externalConnectionId?: string
     schema?: string
@@ -34,9 +38,13 @@ interface Message {
     timestamp: Date
 }
 
+const CHAT_INPUT_MIN_HEIGHT = 44
+const CHAT_INPUT_MAX_HEIGHT = 240
+
 export function AIChat({
     isOpen,
     onClose,
+    prefillPrompt,
     connectionId,
     externalConnectionId,
     schema,
@@ -75,6 +83,30 @@ export function AIChat({
             document.removeEventListener('mousedown', handlePointerDown)
         }
     }, [])
+
+    useEffect(() => {
+        if (!prefillPrompt?.text) {
+            return
+        }
+
+        setInput(prefillPrompt.text)
+        requestAnimationFrame(() => inputRef.current?.focus())
+    }, [prefillPrompt])
+
+    useEffect(() => {
+        const inputElement = inputRef.current
+
+        if (!inputElement) {
+            return
+        }
+
+        inputElement.style.height = 'auto'
+
+        const nextHeight = Math.min(inputElement.scrollHeight, CHAT_INPUT_MAX_HEIGHT)
+
+        inputElement.style.height = `${Math.max(nextHeight, CHAT_INPUT_MIN_HEIGHT)}px`
+        inputElement.style.overflowY = inputElement.scrollHeight > CHAT_INPUT_MAX_HEIGHT ? 'auto' : 'hidden'
+    }, [input])
 
     // AI Settings
     const [selectedProvider, setSelectedProvider] = useState(
@@ -801,9 +833,9 @@ export function AIChat({
                             borderRadius: '10px',
                             lineHeight: '1.4',
                             fontFamily: 'inherit',
-                            minHeight: '44px',
-                            maxHeight: '120px',
-                            overflowY: 'auto',
+                            minHeight: `${CHAT_INPUT_MIN_HEIGHT}px`,
+                            maxHeight: `${CHAT_INPUT_MAX_HEIGHT}px`,
+                            overflowY: 'hidden',
                             outline: 'none',
                             background: '#2a2a2a',
                             color: '#d4d4d4',
