@@ -1,7 +1,6 @@
 ---
 name: ai-tools
-description: Reference for all AI tools available in DBX Studio's AI chat system. Use when adding, modifying, or debugging AI tool definitions, tool execution, or provider integrations.
-user-invocable: false
+description: "Reference for all AI tools available in DBX Studio's AI chat system. Use when adding, modifying, or debugging AI tool definitions, tool execution, or provider integrations."
 ---
 
 # DBX Studio AI Tools Reference
@@ -51,13 +50,37 @@ getOpenAITools() → { type: 'function', function: { name, description, paramete
 
 ## Adding a New Tool
 
-1. Add to `AI_TOOLS` array in `tools.ts`
-2. Add execution logic in `toolExecutor.ts` → `executeTool` switch
-3. Implement the handler function `executeMyNewTool(input, context)`
-4. Both `getAnthropicTools()` and `getOpenAITools()` will pick it up automatically
+### Workflow
+
+1. Define the tool in `AI_TOOLS` array in `tools.ts`:
+   ```typescript
+   {
+     name: "my_new_tool",
+     description: "What this tool does",
+     input_schema: {
+       type: "object",
+       properties: {
+         param_name: { type: "string", description: "What this param is" }
+       },
+       required: ["param_name"]
+     }
+   }
+   ```
+2. Add execution logic in `toolExecutor.ts` → `executeTool` switch:
+   ```typescript
+   case "my_new_tool":
+     return executeMyNewTool(input, context);
+   ```
+3. Implement `executeMyNewTool(input, context)` in the same file
+4. Both `getAnthropicTools()` and `getOpenAITools()` pick it up automatically
 5. For Bedrock, the conversion in `ai-stream.ts` is also automatic
 
-## System Prompt Location
-Main streaming system prompt: [apps/api/src/routes/ai-stream.ts](apps/api/src/routes/ai-stream.ts) around line 132–172
+### Validation Checklist
+- Verify the tool name is unique in `AI_TOOLS`
+- Confirm `input_schema` matches what the handler expects
+- Test with at least one provider (Bedrock streaming is the production default)
+- Update the system prompt `## Tools Available` section in both prompt locations
 
-oRPC chat system prompt: [apps/api/src/orpc/routers/ai/providersWithTools.ts](apps/api/src/orpc/routers/ai/providersWithTools.ts) — `SYSTEM_PROMPT_WITH_TOOLS` constant
+## System Prompt Location
+- Main streaming: [apps/api/src/routes/ai-stream.ts](apps/api/src/routes/ai-stream.ts) ~line 132–172
+- oRPC chat: [apps/api/src/orpc/routers/ai/providersWithTools.ts](apps/api/src/orpc/routers/ai/providersWithTools.ts) — `SYSTEM_PROMPT_WITH_TOOLS`

@@ -1,6 +1,6 @@
 ---
 name: system-prompt
-description: Edit or improve the AI system prompt used in DBX Studio's AI chat. Invoke when the user wants to change how the AI responds, its tone, tool usage order, or response format.
+description: "Edit or improve the AI system prompt used in DBX Studio's AI chat. Use when the user wants to change how the AI responds, its tone, tool usage order, or response format."
 ---
 
 # System Prompt Editor — DBX Studio
@@ -10,45 +10,17 @@ description: Edit or improve the AI system prompt used in DBX Studio's AI chat. 
 There are **two** system prompts in this project:
 
 ### 1. Streaming Prompt (main, used in production)
-**File**: [apps/api/src/routes/ai-stream.ts](../../../apps/api/src/routes/ai-stream.ts)
-**Lines**: ~132–172 (with schema) and ~176–202 (without schema)
-**Variable**: `contextPrompt` (built inline, not a constant)
+- **File**: [apps/api/src/routes/ai-stream.ts](../../../apps/api/src/routes/ai-stream.ts)
+- **Lines**: ~132–172 (with schema) and ~176–202 (without schema)
+- **Variable**: `contextPrompt` (built inline, not a constant)
 
 ### 2. oRPC Provider Prompt (used in `callAnthropicWithTools`, `callOpenAIWithTools`)
-**File**: [apps/api/src/orpc/routers/ai/providersWithTools.ts](../../../apps/api/src/orpc/routers/ai/providersWithTools.ts)
-**Variable**: `SYSTEM_PROMPT_WITH_TOOLS` (top of file)
+- **File**: [apps/api/src/orpc/routers/ai/providersWithTools.ts](../../../apps/api/src/orpc/routers/ai/providersWithTools.ts)
+- **Variable**: `SYSTEM_PROMPT_WITH_TOOLS` (top of file)
 
-## Current Prompt Structure (Streaming)
+## Unified Prompt Structure
 
-```
-You are a SQL assistant...
-## Tools Available    ← list 5 tools
-## Response Style     ← 5 rules: be direct, show results, use tools, minimal explanation, SQL format
-## Examples           ← 2-3 concrete input/output examples
-## Context            ← dynamic schema from generateSQLPrompt()
-Schema: "<schema>"
-## User Query         ← the actual user message
-```
-
-## Prompt Design Rules for DBX Studio
-
-1. **Results first** — answer the question before showing SQL
-2. **Use tools always** — never guess schema or data
-3. **Be concise** — this is a data tool, not a chatbot
-4. **Show SQL only when asked** — use ```sql blocks with uppercase keywords
-5. **Format numbers clearly** — "**1,247 orders**" not "1247"
-
-## When Editing the Prompt
-
-- Keep the `## Tools Available` section in sync with actual tools in `tools.ts`
-- Keep `## Examples` realistic to real user queries
-- The `${enhancedPrompt}` injection must stay — it contains live schema context
-- Do not remove `Schema: "${schema || 'public'}"` line — it scopes queries
-- Both prompts (streaming + oRPC) should stay consistent in style
-
-## Current Prompt Structure (as of last update)
-
-Both prompts now follow this unified structure:
+Both prompts follow this structure:
 
 ```
 You are DBX Studio's AI assistant — expert SQL analyst and data explorer.
@@ -82,3 +54,48 @@ Schema: "{schema}"
 ## User Query
 {query}
 ```
+
+## Editing Workflow
+
+### Step 1: Identify which prompt to change
+- **Tone, response format, tool ordering** → edit both prompts for consistency
+- **Schema context injection** → streaming prompt only (`ai-stream.ts`)
+- **Tool-specific behavior** → oRPC prompt only (`providersWithTools.ts`)
+
+### Step 2: Make the edit
+Follow these constraints:
+- Keep `## Tools Available` in sync with actual tools in `tools.ts`
+- Keep `## Examples` realistic to real user queries
+- The `${enhancedPrompt}` injection must stay — it contains live schema context
+- Do not remove `Schema: "${schema || 'public'}"` — it scopes queries
+- Both prompts (streaming + oRPC) should stay consistent in style
+
+### Step 3: Validate the change
+1. Compare the streaming and oRPC prompts — confirm shared sections match
+2. Verify all tool names in the prompt exist in `tools.ts`
+3. Test with a sample query to confirm expected behavior
+
+## Prompt Design Rules
+
+1. **Results first** — answer the question before showing SQL
+2. **Use tools always** — never guess schema or data
+3. **Be concise** — this is a data tool, not a chatbot
+4. **Show SQL only when asked** — use ```sql blocks with uppercase keywords
+5. **Format numbers clearly** — "**1,247 orders**" not "1247"
+
+## Example: Adding a New Response Rule
+
+**Before** (prompt lacks chart preference):
+```
+## Response Rules
+1. Results first — answer before explaining
+```
+
+**After** (added chart auto-suggestion):
+```
+## Response Rules
+1. Results first — answer before explaining
+2. When results have a time dimension, suggest a line chart
+```
+
+Update the rule in **both** prompt locations, then verify with: "Show me orders this month" — the AI should suggest a chart.
