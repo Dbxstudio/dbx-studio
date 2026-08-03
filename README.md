@@ -8,14 +8,14 @@
 
 </div>
 
-# dbx Studio
+# DBx Studio
 Free AI-powered open-source database management tool that simplifies database interactions with secure connection storage and AI-assisted SQL query writing.
 
 ---
 
-## ✨ Try dbx Studio
+## ✨ Try DBx Studio
 
-[![Download dbx Studio](apps/web/public/assets/Whisk_bbc181a05014fcc973741ec56f489558dr%201.png)](https://www.dbxstudio.com/download)
+[![Download DBx Studio](apps/web/public/assets/Whisk_bbc181a05014fcc973741ec56f489558dr%201.png)](https://www.dbxstudio.com/download)
 
 
 ---
