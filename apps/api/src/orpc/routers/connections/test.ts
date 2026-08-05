@@ -10,6 +10,7 @@ import {
     createTempMysqlConnection,
     createMssqlConnection,
     createClickHouseConnection,
+    createTempClickHouseConnection,
     createSnowflakeConnection,
     executeSnowflakeQuery,
     createTempSnowflakeConnection,
@@ -119,12 +120,23 @@ export const test = orpc
                 }
 
                 case 'clickhouse': {
-                    const client = createClickHouseConnection(connectionConfig as any)
-                    await client.query({
-                        query: 'SELECT 1',
-                        format: 'JSONEachRow',
-                    })
-                    // DON'T close - client is cached
+                    if (isExistingConnection) {
+                        const client = createClickHouseConnection(connectionConfig as any)
+                        await client.query({
+                            query: 'SELECT 1',
+                            format: 'JSONEachRow',
+                        })
+                    } else {
+                        const client = createTempClickHouseConnection(connectionConfig)
+                        try {
+                            await client.query({
+                                query: 'SELECT 1',
+                                format: 'JSONEachRow',
+                            })
+                        } finally {
+                            await client.close()
+                        }
+                    }
                     break
                 }
 

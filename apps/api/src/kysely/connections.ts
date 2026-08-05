@@ -3,9 +3,29 @@ import { Kysely, PostgresDialect, MysqlDialect, SqliteDialect } from 'kysely'
 import pg from 'pg'
 import mysql from 'mysql2'
 import mssql from 'mssql'
-import { createClient as createClickHouseClient } from '@clickhouse/client'
+import { createClient as createClickHouseClient } from '@clickhouse/client-web'
 import snowflake from 'snowflake-sdk'
-import { Database as BunSQLite } from 'bun:sqlite'
+// Check if we are running in Bun
+const isBun = typeof Bun !== 'undefined'
+
+// Dynamically import BunSQLite or use a shim for Node.js
+let BunSQLite: any
+if (isBun) {
+    try {
+        // @ts-ignore
+        const sqlite = await import('bun:sqlite')
+        BunSQLite = sqlite.Database
+    } catch (e) {
+        console.warn('Failed to load bun:sqlite even though Bun was detected')
+    }
+} else {
+    // Shim for Node.js to prevent crash - users on Node should use other dialects
+    BunSQLite = class {
+        constructor() { throw new Error('bun:sqlite is only available in Bun runtime. Please use SQLite with a Node-compatible driver.') }
+        close() {}
+    }
+}
+
 import { closeAllBigQueryConnections, closeBigQueryConnection } from './bigquery'
 
 // Generic database interface for Kysely
@@ -151,17 +171,47 @@ export function createClickHouseConnection(connection: Connection) {
     const cacheKey = `clickhouse:${connection.id}`
 
     if (!connectionPools.has(cacheKey)) {
+        // Force SSL bypass for Bun/Node environments
+        if (connection.protocol === 'https') {
+            process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        }
+
         const client = createClickHouseClient({
             host: `${connection.protocol || 'http'}://${connection.host || 'localhost'}:${connection.port || 8123}`,
             username: connection.username || 'default',
             password: connection.password || '',
             database: connection.database || 'default',
+            // @ts-ignore - settings type is slightly different but same keys work
+            clickhouse_settings: {
+                max_execution_time: 60,
+            },
         })
 
         connectionPools.set(cacheKey, client)
     }
 
     return connectionPools.get(cacheKey) as ReturnType<typeof createClickHouseClient>
+}
+
+/**
+ * Create a temporary ClickHouse client for testing (not cached)
+ */
+export function createTempClickHouseConnection(connection: Partial<Connection>) {
+    // Force SSL bypass for Bun/Node environments where standard config might be ignored
+    if (connection.protocol === 'https') {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    }
+    
+    return createClickHouseClient({
+        host: `${connection.protocol || 'http'}://${connection.host || 'localhost'}:${connection.port || 8123}`,
+        username: connection.username || 'default',
+        password: connection.password || '',
+        database: connection.database || 'default',
+        // @ts-ignore
+        clickhouse_settings: {
+            max_execution_time: 60,
+        },
+    })
 }
 
 /**

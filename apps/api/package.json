@@ -4,9 +4,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "bun run --hot src/index.ts",
-        "build": "bun build src/index.ts --outdir ./dist --target bun",
-        "start": "bun run dist/index.js",
+        "dev": "tsx watch src/index.ts",
+        "build": "bun build src/index.ts --outdir ./dist --target node",
+        "start": "node dist/index.js",
         "lint": "eslint src/",
         "clean": "rm -rf dist node_modules",
         "db:generate": "drizzle-kit generate",
@@ -17,8 +17,10 @@
     "dependencies": {
         "@aws-sdk/client-bedrock-runtime": "^3.966.0",
         "@clickhouse/client": "^1.15.0",
+        "@clickhouse/client-web": "^1.18.3",
         "@electric-sql/pglite": "^0.2.14",
         "@google-cloud/bigquery": "^8.1.1",
+        "@hono/node-server": "^2.0.0",
         "@hono/zod-validator": "^0.4.0",
         "@orpc/server": "^1.13.0",
         "@smithy/node-http-handler": "^4.4.9",
@@ -45,7 +47,9 @@
         "@types/mssql": "^9.1.8",
         "@types/pg": "^8.16.0",
         "bun-types": "latest",
+        "cross-env": "^7.0.3",
         "drizzle-kit": "^0.31.8",
+        "tsx": "^4.21.0",
         "typescript": "^5.7.0"
     }
 }
