@@ -1,6 +1,9 @@
 ---
 name: data-exploration-tool
 description: Systematic database and table profiling for DBX Studio. Use when a user wants to understand their data, explore schema structure, or profile a dataset.
+source:
+  type: repository
+  repository: Dbxstudio/dbx-studio
 ---
 
 # Data Exploration — DBX Studio
