@@ -272,7 +272,9 @@ function AppContent() {
     }, [activeTab?.id, activeTab?.type, activeTab?.schema, schemas])
 
     // Fetch tables for autocomplete
-    const { data: tables } = useTables(selectedConnectionId || '', activeTab?.schema || 'public')
+    const resolvedSchema = activeTab?.schema || schemas?.[0]?.name || 'public'
+
+    const { data: tables } = useTables(selectedConnectionId || '', resolvedSchema)
 
     // Prepare tables with columns for autocomplete
     const tablesWithColumns = useMemo(() => {
@@ -287,7 +289,7 @@ function AppContent() {
     const { data: tableColumnsData, error: tableColumnsError } = useTableColumns(
         activeTab?.type === 'table' ? activeTab.connectionId || '' : '',
         activeTab?.tableName || '',
-        activeTab?.schema || 'public'
+        resolvedSchema
     )
 
     // Build server-side filters for FK navigation
@@ -313,7 +315,7 @@ function AppContent() {
     } = useInfiniteTableData(
         activeTab?.type === 'table' ? activeTab.connectionId || '' : '',
         activeTab?.tableName || '',
-        activeTab?.schema || 'public',
+        resolvedSchema,
         { pageSize: 50, filters: serverFilters }
     )
 
@@ -485,7 +487,7 @@ function AppContent() {
 
         // Save current table context to history
         const currentContext: TableContext = {
-            schema: activeTab.schema || 'public',
+            schema: resolvedSchema,
             tableName: activeTab.tableName || '',
             title: activeTab.title,
             filterColumn: activeTab.filterColumn,
@@ -672,7 +674,7 @@ function AppContent() {
             await updateRowMutation({
                 connectionId: activeTab.connectionId || '',
                 tableName: activeTab.tableName || '',
-                schema: activeTab.schema || 'public',
+                schema: resolvedSchema,
                 primaryKey,
                 data: { [columnId]: typedValue },
             })
@@ -692,7 +694,7 @@ function AppContent() {
 
         const connectionId = activeTab.connectionId || ''
         const tableName = activeTab.tableName || ''
-        const schema = activeTab.schema || 'public'
+        const schema = resolvedSchema
 
         try {
             const result = await insertRowMutation({ connectionId, tableName, schema, data: row })
@@ -734,7 +736,7 @@ function AppContent() {
                 await deleteRowMutation({
                     connectionId: activeTab.connectionId || '',
                     tableName: activeTab.tableName || '',
-                    schema: activeTab.schema || 'public',
+                    schema: resolvedSchema,
                     primaryKey,
                 })
             }
@@ -1005,7 +1007,7 @@ function AppContent() {
                                             {tableSubTab === 'properties' ? (
                                                 <TableProperties
                                                     tableName={activeTab.tableName || ''}
-                                                    schema={activeTab.schema || 'public'}
+                                                    schema={resolvedSchema}
                                                     databaseName={selectedConnection?.database}
                                                     columns={tableColumnsData || []}
                                                     loading={!tableColumnsData}

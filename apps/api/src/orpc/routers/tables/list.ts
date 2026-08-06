@@ -12,6 +12,7 @@ import {
     createRedshiftConnection,
     createSqliteConnection,
 } from '~/kysely/connections'
+import { bigQueryTables, createBigQueryConnection, resolveBigQueryConfig } from '~/kysely/bigquery'
 import { sql } from 'kysely'
 
 const listTablesSchema = z.object({
@@ -161,6 +162,34 @@ export const list = orpc
                         name: row.name,
                         type: row.type === 'view' ? 'view' : 'table',
                     }))
+                }
+
+                case 'bigquery': {
+                    const bqConfig = resolveBigQueryConfig(connection)
+                    if (!bqConfig) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery connection requires projectId and keyFilename',
+                        })
+                    }
+
+                    const dataset = input.schema === 'public'
+                        ? (connection.dataset || '')
+                        : input.schema
+
+                    if (!dataset) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery dataset is required. Set dataset on the connection or choose a schema.',
+                        })
+                    }
+
+                    const client = createBigQueryConnection({
+                        connectionId: connection.id,
+                        projectId: bqConfig.projectId,
+                        keyFilename: bqConfig.keyFilename,
+                        dataset: bqConfig.dataset,
+                    })
+
+                    return await bigQueryTables(client, dataset)
                 }
 
                 default:

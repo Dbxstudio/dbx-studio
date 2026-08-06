@@ -9,6 +9,7 @@ import { db } from '../drizzle'
 import { connections } from '../drizzle/schema/connections'
 import { eq } from 'drizzle-orm'
 import { getConnection } from '../kysely'
+import { bigQueryQuery, bigQueryTables, createBigQueryConnection, resolveBigQueryConfig } from '../kysely/bigquery'
 
 /**
  * Tool definition for database query execution
@@ -263,6 +264,30 @@ export async function executeSQLQuery(
             }
         }
 
+        if (connection.type === 'bigquery') {
+            const bqConfig = resolveBigQueryConfig(connection)
+            if (!bqConfig) {
+                return {
+                    success: false,
+                    error: 'BigQuery connection requires projectId and keyFilename',
+                }
+            }
+
+            const client = createBigQueryConnection({
+                connectionId: connection.id,
+                projectId: bqConfig.projectId,
+                keyFilename: bqConfig.keyFilename,
+                dataset: bqConfig.dataset,
+            })
+            const rows = await bigQueryQuery(client, query, database || connection.dataset || bqConfig.dataset)
+
+            return {
+                success: true,
+                data: rows,
+                rowCount: rows.length,
+            }
+        }
+
         // Get Kysely instance
         const kysely = getConnection(connection)
 
@@ -311,6 +336,81 @@ export async function inspectDatabaseSchema(
             return {
                 success: false,
                 error: `No database connection found for ID: ${connectionId}`
+            }
+        }
+
+        if (connection.type === 'bigquery') {
+            const bqConfig = resolveBigQueryConfig(connection)
+            if (!bqConfig) {
+                return {
+                    success: false,
+                    error: 'BigQuery connection requires projectId and keyFilename',
+                }
+            }
+
+            const dataset = schema || connection.dataset || bqConfig.dataset
+            if (!dataset) {
+                return {
+                    success: false,
+                    error: 'BigQuery dataset is required for schema inspection',
+                }
+            }
+
+            const client = createBigQueryConnection({
+                connectionId: connection.id,
+                projectId: bqConfig.projectId,
+                keyFilename: bqConfig.keyFilename,
+                dataset: bqConfig.dataset,
+            })
+
+            const allTables = await bigQueryTables(client, dataset)
+
+            const requestedTableNames = tableNames
+                ? tableNames.split(',').map((t) => {
+                    const parts = t.trim().split('.')
+                    return parts.length > 1 ? parts[parts.length - 1] : parts[0]
+                })
+                : null
+
+            const filteredTables = requestedTableNames
+                ? allTables.filter((table) => requestedTableNames.includes(table.name))
+                : allTables
+
+            if (requestedTableNames && filteredTables.length === 0) {
+                return {
+                    success: false,
+                    error: `No tables found matching: ${tableNames}. Available tables: ${allTables.map(t => t.name).join(', ')}`,
+                }
+            }
+
+            const tablesWithColumns = await Promise.all(
+                filteredTables.map(async (table) => {
+                    const rows = await bigQueryQuery(
+                        client,
+                        `SELECT column_name, data_type, is_nullable
+                         FROM \`${dataset}.INFORMATION_SCHEMA.COLUMNS\`
+                         WHERE table_name = '${table.name.replace(/'/g, "''")}'
+                         ORDER BY ordinal_position`,
+                        dataset,
+                    )
+
+                    return {
+                        name: table.name,
+                        schema: dataset,
+                        columns: rows.map((col: any) => ({
+                            name: String(col.column_name || ''),
+                            type: String(col.data_type || 'STRING'),
+                            nullable: String(col.is_nullable || 'YES') === 'YES',
+                        })),
+                    }
+                }),
+            )
+
+            return {
+                success: true,
+                data: {
+                    tables: tablesWithColumns,
+                },
             }
         }
 
@@ -391,6 +491,8 @@ export async function generateSQLPrompt(
     tables?: string[]
 ): Promise<string> {
     try {
+        const [connection] = await db.select().from(connections).where(eq(connections.id, connectionId))
+
         // Get schema information
         const schemaResult = await inspectDatabaseSchema(connectionId)
 
@@ -419,6 +521,14 @@ export async function generateSQLPrompt(
             schemaText += '\n'
         }
 
+        const isBigQuery = connection?.type === 'bigquery'
+        const qualificationHint = isBigQuery
+            ? "- ALWAYS use fully qualified table names with BigQuery style (e.g. `project.dataset.table`)"
+            : "- ALWAYS use fully qualified table names (e.g. 'schema.table') to avoid ambiguity"
+        const syntaxHint = isBigQuery
+            ? '- Use BigQuery Standard SQL and backticks for identifiers when needed'
+            : '- Use SQL syntax compatible with the target dialect'
+
         // Build prompt with EXACT structure from SUMR (ai-services.js line 1098-1230)
         const prompt = `You are DBX - an expert AI database assistant specialized in generating SQL queries.
 
@@ -437,7 +547,8 @@ ${schemaText}
 - Return ONLY the SQL query
 - Do not include markdown code blocks or explanations
 - Ensure the query is syntactically correct and executable
-- ALWAYS use fully qualified table names (e.g. 'schema.table') to avoid ambiguity
+${qualificationHint}
+${syntaxHint}
 </response_format>
 
 <user_question>
