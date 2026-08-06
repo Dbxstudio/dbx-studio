@@ -140,6 +140,8 @@ async function buildSchemaContext(
             throw new Error('Connection not found')
         }
 
+        const resolvedSchemaName = schemaName || (connection.type === 'bigquery' ? connection.dataset || 'default' : 'public')
+
         let context = `Database Type: ${connection.type}\n`
         let schemaId: number | undefined
         let tableIds: number[] = []
@@ -148,7 +150,7 @@ async function buildSchemaContext(
             // Context mode: Single table
             const schemaRecord = await db.query.schemas.findFirst({
                 where: and(
-                    eq(schemas.schemaName, schemaName || 'public'),
+                    eq(schemas.schemaName, resolvedSchemaName),
                 ),
             })
 
@@ -175,7 +177,7 @@ async function buildSchemaContext(
             // Collection mode: All or specific tables
             const schemaRecord = await db.query.schemas.findFirst({
                 where: and(
-                    eq(schemas.schemaName, schemaName || 'public'),
+                    eq(schemas.schemaName, resolvedSchemaName),
                 ),
             })
 
@@ -200,7 +202,7 @@ async function buildSchemaContext(
                 }
 
                 tableIds = tableRecords.map(t => t.id)
-                context += `\nSchema: ${schemaName || 'public'}`
+                context += `\nSchema: ${resolvedSchemaName}`
                 context += `\nTables: ${tableRecords.map(t => t.tableName).join(', ')}`
             }
         }

@@ -7,6 +7,7 @@ export { AIChat } from './components/AIChat'
 export { ChatMessage, ChatMessages } from './components/ChatMessage'
 export { ChatInput, ProviderSelect, ChatSettings } from './components/ChatInput'
 export { SessionList } from './components/SessionList'
+export { ResizableChatPanel } from './ResizableChatPanel'
 
 // Pages
 export { ChatPage } from './pages/ChatPage'

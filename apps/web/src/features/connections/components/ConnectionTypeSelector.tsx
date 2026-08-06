@@ -1,10 +1,10 @@
 import { FaTimes, FaDatabase } from 'react-icons/fa'
 import { BiLogoPostgresql } from 'react-icons/bi'
 import { GrMysql } from 'react-icons/gr'
-import { SiSnowflake, SiSqlite, SiSupabase, SiAmazonredshift } from 'react-icons/si'
+import { SiSnowflake, SiSqlite, SiSupabase, SiAmazonredshift, SiGooglebigquery, SiClickhouse } from 'react-icons/si'
 import './connection-modal.css'
 
-export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase' | 'redshift'
+export type ConnectionType = 'postgresql' | 'mysql' | 'mssql' | 'sqlite' | 'snowflake' | 'supabase' | 'redshift' | 'bigquery' | 'clickhouse'
 
 interface ConnectionTypeConfig {
     type: ConnectionType
@@ -46,10 +46,22 @@ const connectionTypes: ConnectionTypeConfig[] = [
         description: 'Connect to SQLite databases',
     },
     {
+        type: 'bigquery',
+        name: 'BigQuery',
+        icon: <SiGooglebigquery size={40} className="connection-type-icon bigquery" />,
+        description: 'Connect to Google BigQuery',
+    },
+    {
         type: 'redshift',
         name: 'Amazon Redshift',
         icon: <SiAmazonredshift size={40} className="connection-type-icon redshift" />,
         description: 'Connect to Amazon Redshift',
+    },
+    {
+        type: 'clickhouse',
+        name: 'ClickHouse',
+        icon: <SiClickhouse size={40} className="connection-type-icon clickhouse" />,
+        description: 'Connect to ClickHouse database',
     },
     {
         type: 'mssql',

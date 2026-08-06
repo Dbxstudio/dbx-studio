@@ -9,7 +9,17 @@ import {
     createRedshiftConnection,
     createSqliteConnection,
 } from '~/kysely/connections'
+import { bigQueryQuery, createBigQueryConnection, resolveBigQueryConfig } from '~/kysely/bigquery'
 import { sql } from 'kysely'
+
+function quoteBigQueryIdentifier(identifier: string): string {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+        throw new ORPCError('BAD_REQUEST', {
+            message: `Invalid BigQuery identifier: ${identifier}`,
+        })
+    }
+    return `\`${identifier}\``
+}
 
 const getCountSchema = z.object({
     connectionId: z.string(),
@@ -106,6 +116,42 @@ export const count = orpc
                         SELECT COUNT(*) as count FROM ${sql.raw(fullTableName)}
                     `.execute(kysely)
                     const total = Number(countResult.rows[0]?.count || 0)
+
+                    return { count: total }
+                }
+
+                case 'bigquery': {
+                    const bqConfig = resolveBigQueryConfig(connection)
+                    if (!bqConfig) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery connection requires projectId and keyFilename',
+                        })
+                    }
+
+                    const dataset = input.schema === 'public'
+                        ? (connection.dataset || '')
+                        : input.schema
+
+                    if (!dataset) {
+                        throw new ORPCError('BAD_REQUEST', {
+                            message: 'BigQuery dataset is required. Set dataset on the connection or choose a schema.',
+                        })
+                    }
+
+                    const client = createBigQueryConnection({
+                        connectionId: connection.id,
+                        projectId: bqConfig.projectId,
+                        keyFilename: bqConfig.keyFilename,
+                        dataset: bqConfig.dataset,
+                    })
+
+                    const quotedTable = `${quoteBigQueryIdentifier(bqConfig.projectId)}.${quoteBigQueryIdentifier(dataset)}.${quoteBigQueryIdentifier(input.tableName)}`
+                    const countRows = await bigQueryQuery(
+                        client,
+                        `SELECT COUNT(*) AS count FROM ${quotedTable}`,
+                        dataset,
+                    )
+                    const total = Number((countRows[0] as any)?.count || 0)
 
                     return { count: total }
                 }

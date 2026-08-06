@@ -4,7 +4,7 @@ import { db, connections } from '~/drizzle'
 
 const createConnectionSchema = z.object({
     name: z.string().min(1, 'Connection name is required'),
-    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite']),
+    type: z.enum(['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'supabase', 'redshift', 'sqlite', 'bigquery']),
     userId: z.string().optional(), // Owner of this connection
     host: z.string().optional(),
     port: z.number().optional(),
@@ -19,6 +19,9 @@ const createConnectionSchema = z.object({
     warehouse: z.string().optional(),
     role: z.string().optional(),
     protocol: z.string().optional(),
+    projectId: z.string().optional(),
+    keyFilename: z.string().optional(),
+    dataset: z.string().optional(),
     connectionString: z.string().optional(),
     label: z.string().optional(),
     color: z.string().optional(),

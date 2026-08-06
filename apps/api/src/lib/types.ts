@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // Supported database dialects
-export const dialects = ['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake'] as const
+export const dialects = ['postgresql', 'mysql', 'mssql', 'clickhouse', 'snowflake', 'bigquery'] as const
 export type Dialect = typeof dialects[number]
 
 // API Response types
@@ -34,6 +34,10 @@ export interface Connection {
     account?: string
     warehouse?: string
     role?: string
+    // BigQuery specific
+    projectId?: string
+    keyFilename?: string
+    dataset?: string
     // Metadata
     createdAt: Date
     updatedAt?: Date

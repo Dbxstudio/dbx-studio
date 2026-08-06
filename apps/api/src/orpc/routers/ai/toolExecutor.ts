@@ -20,6 +20,22 @@ interface ToolContext {
     schemaName?: string
 }
 
+async function resolveDefaultSchemaName(context: ToolContext): Promise<string> {
+    if (context.schemaName) {
+        return context.schemaName
+    }
+
+    const connection = await db.query.connections.findFirst({
+        where: eq(connections.id, context.connectionId),
+    })
+
+    if (connection?.type === 'bigquery') {
+        return connection.dataset || 'default'
+    }
+
+    return 'public'
+}
+
 /**
  * Execute a tool call and return the result
  */
@@ -72,7 +88,7 @@ async function executeReadSchema(
     input: any,
     context: ToolContext
 ): Promise<ToolResult> {
-    const schemaName = input.schema_name || 'public'
+    const schemaName = input.schema_name || await resolveDefaultSchemaName(context)
 
     // Get tables from our schema store
     const tables = await db.query.schemaTables.findMany()
@@ -101,7 +117,8 @@ async function executeGetTableData(
     input: any,
     context: ToolContext
 ): Promise<ToolResult> {
-    const { table_name, schema_name = 'public', limit = 10 } = input
+    const schema_name = input.schema_name || await resolveDefaultSchemaName(context)
+    const { table_name, limit = 10 } = input
 
     // Build SELECT query
     const sql = `SELECT * FROM "${schema_name}"."${table_name}" LIMIT ${Math.min(limit, 100)}`
@@ -195,7 +212,8 @@ async function executeDescribeTable(
     input: any,
     context: ToolContext
 ): Promise<ToolResult> {
-    const { table_name, schema_name = 'public' } = input
+    const schema_name = input.schema_name || await resolveDefaultSchemaName(context)
+    const { table_name } = input
 
     const tableInfo = await db.query.schemaTables.findFirst({
         where: eq(schemaTables.tableName, table_name)
@@ -227,7 +245,8 @@ async function executeGetTableStats(
     input: any,
     context: ToolContext
 ): Promise<ToolResult> {
-    const { table_name, schema_name = 'public' } = input
+    const schema_name = input.schema_name || await resolveDefaultSchemaName(context)
+    const { table_name } = input
 
     const tableInfo = await db.query.schemaTables.findFirst({
         where: eq(schemaTables.tableName, table_name)

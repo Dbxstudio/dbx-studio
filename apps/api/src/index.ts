@@ -1,3 +1,8 @@
+// NOTE: Must be set BEFORE any network clients are imported/initialized.
+// This allows connecting to ClickHouse Cloud and other services with self-signed
+// or unrecognized SSL certificates in development environments.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
@@ -7,6 +12,7 @@ import { timing } from 'hono/timing'
 import { onError } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import consola from 'consola'
+import { serve } from '@hono/node-server'
 
 // Import database
 import { initializeDatabase } from './drizzle'
@@ -14,6 +20,7 @@ import { initializeDatabase } from './drizzle'
 // Import routes
 import { healthRoutes } from './routes/health'
 import { aiStreamRoutes } from './routes/ai-stream'
+import { bigQueryRoutes } from './routes/bigquery'
 import { createContext } from './orpc/context'
 import { router } from './orpc/routers'
 
@@ -91,6 +98,9 @@ app.route('/health', healthRoutes)
 // Mount AI streaming routes
 app.route('/ai', aiStreamRoutes)
 
+// Mount BigQuery v1 routes
+app.route('/v1/bigquery', bigQueryRoutes)
+
 // Mount oRPC handler
 app.use('/rpc/*', async (c, next) => {
     const { matched, response } = await rpcHandler.handle(c.req.raw, {
@@ -115,6 +125,7 @@ app.get('/', (c) => {
         endpoints: {
             health: '/api/health',
             rpc: '/api/rpc',
+            bigqueryTestConnection: '/api/v1/bigquery/test-connection',
         },
     })
 })
@@ -171,6 +182,19 @@ consola.box({
         borderColor: 'cyan',
     },
 })
+
+// Start server conditionally based on runtime
+if (typeof Bun === 'undefined') {
+    consola.info('Detected Node.js runtime - starting Hono node-server')
+    serve({
+        fetch: app.fetch,
+        port,
+    }, (info) => {
+        consola.success(`Node.js server listening on http://localhost:${info.port}`)
+    })
+} else {
+    consola.info('Detected Bun runtime - using native Bun.serve')
+}
 
 export default {
     port,

@@ -75,6 +75,9 @@ export async function initializeDatabase() {
             warehouse TEXT,
             role TEXT,
             protocol TEXT,
+            project_id TEXT,
+            key_filename TEXT,
+            dataset TEXT,
             connection_string TEXT,
             label TEXT,
             color TEXT,
@@ -214,7 +217,7 @@ export async function initializeDatabase() {
         );
 
         -- Insert default database types
-        INSERT INTO db_types (name) VALUES ('postgresql'), ('mysql'), ('mssql'), ('clickhouse'), ('snowflake')
+        INSERT INTO db_types (name) VALUES ('postgresql'), ('mysql'), ('mssql'), ('clickhouse'), ('snowflake'), ('bigquery')
         ON CONFLICT (name) DO NOTHING;
 
         -- Insert default connection statuses

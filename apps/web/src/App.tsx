@@ -7,7 +7,7 @@ import { ConnectionModal } from './features/connections'
 import { SQLEditor } from './features/editor'
 import { ResultsPanel } from './features/results'
 import { DataGrid } from './features/datagrid'
-import { AIChat } from './features/ai'
+import { AIChat, ResizableChatPanel } from './features/ai'
 import { SettingsPage } from './features/settings'
 import { AuthProvider, useAuth, Login } from './features/auth'
 import { useConnections, useTables, useTableColumns, useInfiniteTableData, useExecuteQuery, useSchemas, useInsertRow, useUpdateRow, useDeleteRow, useDeleteConnection } from './shared/hooks'
@@ -237,9 +237,28 @@ function AppContent() {
     // Get active tab
     const activeTab = tabs.find(t => t.id === activeTabId)
 
-    // Selected connection for the active worksheet
-    const selectedConnectionId = activeTab?.connectionId || connections[0]?.id
+    const hasValidActiveConnection = !!activeTab?.connectionId
+        && connections.some(c => c.id === activeTab.connectionId)
+
+    // Selected connection for the active worksheet.
+    // If a cached tab points to a deleted/stale connection, fall back to the first valid one.
+    const selectedConnectionId = hasValidActiveConnection
+        ? activeTab?.connectionId
+        : connections[0]?.id
     const selectedConnection = connections.find(c => c.id === selectedConnectionId)
+
+    // Auto-recover stale cached connection IDs in the active tab.
+    useEffect(() => {
+        if (!activeTab || !activeTab.connectionId || hasValidActiveConnection || connections.length === 0) {
+            return
+        }
+
+        setTabs(prev => prev.map(tab =>
+            tab.id === activeTab.id
+                ? { ...tab, connectionId: connections[0].id, schema: undefined }
+                : tab
+        ))
+    }, [activeTab, hasValidActiveConnection, connections])
 
     // Fetch schemas for the selected connection
     const { data: schemas } = useSchemas(selectedConnectionId)
@@ -272,7 +291,9 @@ function AppContent() {
     }, [activeTab?.id, activeTab?.type, activeTab?.schema, schemas])
 
     // Fetch tables for autocomplete
-    const { data: tables } = useTables(selectedConnectionId || '', activeTab?.schema || 'public')
+    const resolvedSchema = activeTab?.schema || schemas?.[0]?.name || 'public'
+
+    const { data: tables } = useTables(selectedConnectionId || '', resolvedSchema)
 
     // Prepare tables with columns for autocomplete
     const tablesWithColumns = useMemo(() => {
@@ -285,9 +306,11 @@ function AppContent() {
 
     // Fetch table data if viewing a table tab
     const { data: tableColumnsData, error: tableColumnsError } = useTableColumns(
-        activeTab?.type === 'table' ? activeTab.connectionId || '' : '',
+        activeTab?.type === 'table' && activeTab.connectionId && connections.some(c => c.id === activeTab.connectionId)
+            ? activeTab.connectionId
+            : '',
         activeTab?.tableName || '',
-        activeTab?.schema || 'public'
+        resolvedSchema
     )
 
     // Build server-side filters for FK navigation
@@ -311,9 +334,11 @@ function AppContent() {
         refetch: refetchTableData,
         error: tableDataError,
     } = useInfiniteTableData(
-        activeTab?.type === 'table' ? activeTab.connectionId || '' : '',
+        activeTab?.type === 'table' && activeTab.connectionId && connections.some(c => c.id === activeTab.connectionId)
+            ? activeTab.connectionId
+            : '',
         activeTab?.tableName || '',
-        activeTab?.schema || 'public',
+        resolvedSchema,
         { pageSize: 50, filters: serverFilters }
     )
 
@@ -485,7 +510,7 @@ function AppContent() {
 
         // Save current table context to history
         const currentContext: TableContext = {
-            schema: activeTab.schema || 'public',
+            schema: resolvedSchema,
             tableName: activeTab.tableName || '',
             title: activeTab.title,
             filterColumn: activeTab.filterColumn,
@@ -672,7 +697,7 @@ function AppContent() {
             await updateRowMutation({
                 connectionId: activeTab.connectionId || '',
                 tableName: activeTab.tableName || '',
-                schema: activeTab.schema || 'public',
+                schema: resolvedSchema,
                 primaryKey,
                 data: { [columnId]: typedValue },
             })
@@ -692,7 +717,7 @@ function AppContent() {
 
         const connectionId = activeTab.connectionId || ''
         const tableName = activeTab.tableName || ''
-        const schema = activeTab.schema || 'public'
+        const schema = resolvedSchema
 
         try {
             const result = await insertRowMutation({ connectionId, tableName, schema, data: row })
@@ -734,7 +759,7 @@ function AppContent() {
                 await deleteRowMutation({
                     connectionId: activeTab.connectionId || '',
                     tableName: activeTab.tableName || '',
-                    schema: activeTab.schema || 'public',
+                    schema: resolvedSchema,
                     primaryKey,
                 })
             }
@@ -1005,7 +1030,7 @@ function AppContent() {
                                             {tableSubTab === 'properties' ? (
                                                 <TableProperties
                                                     tableName={activeTab.tableName || ''}
-                                                    schema={activeTab.schema || 'public'}
+                                                    schema={resolvedSchema}
                                                     databaseName={selectedConnection?.database}
                                                     columns={tableColumnsData || []}
                                                     loading={!tableColumnsData}
@@ -1063,35 +1088,36 @@ function AppContent() {
                                 </div>
                             </div>
 
-                            {/* Right Panel - AI Chat */}
-                            {showAIChat && (
-                                <div className="query-right">
-                                    <AIChat
-                                        isOpen={showAIChat}
-                                        onClose={() => setShowAIChat(false)}
-                                        prefillPrompt={aiChatPrefill}
-                                        connectionId={selectedConnectionId}
-                                        externalConnectionId={selectedConnection?.externalConnectionId}
-                                        schema={activeTab?.schema}
-                                        tables={tables?.map(t => t.name)}
-                                        tableDetails={activeTab?.type === 'table' && activeTab.tableName ? {
-                                            tableName: activeTab.tableName,
-                                            schema: activeTab.schema,
-                                            columns: tableColumnsData?.map(c => ({
-                                                name: c.name,
-                                                type: c.type,
-                                                nullable: c.nullable,
-                                                isPrimaryKey: c.isPrimaryKey,
-                                            })),
-                                            sampleRows: tableDataRows.slice(0, 3),
-                                        } : undefined}
-                                        worksheets={worksheetsForAIChat}
-                                        activeWorksheetId={activeTab?.type === 'worksheet' ? activeTab.id : worksheetsForAIChat[0]?.id}
-                                        onSelectWorksheet={handleSelectWorksheet}
-                                        onRunQuery={handleRunQueryWithSQL}
-                                    />
-                                </div>
-                            )}
+                            {/* Right Panel - Resizable AI Chat */}
+                            <ResizableChatPanel
+                                isOpen={showAIChat}
+                                onClose={() => setShowAIChat(false)}
+                            >
+                                <AIChat
+                                    isOpen={showAIChat}
+                                    onClose={() => setShowAIChat(false)}
+                                    prefillPrompt={aiChatPrefill}
+                                    connectionId={selectedConnectionId}
+                                    externalConnectionId={selectedConnection?.externalConnectionId}
+                                    schema={activeTab?.schema}
+                                    tables={tables?.map(t => t.name)}
+                                    tableDetails={activeTab?.type === 'table' && activeTab.tableName ? {
+                                        tableName: activeTab.tableName,
+                                        schema: activeTab.schema,
+                                        columns: tableColumnsData?.map(c => ({
+                                            name: c.name,
+                                            type: c.type,
+                                            nullable: c.nullable,
+                                            isPrimaryKey: c.isPrimaryKey,
+                                        })),
+                                        sampleRows: tableDataRows.slice(0, 3),
+                                    } : undefined}
+                                    worksheets={worksheetsForAIChat}
+                                    activeWorksheetId={activeTab?.type === 'worksheet' ? activeTab.id : worksheetsForAIChat[0]?.id}
+                                    onSelectWorksheet={handleSelectWorksheet}
+                                    onRunQuery={handleRunQueryWithSQL}
+                                />
+                            </ResizableChatPanel>
                         </div>
                     )}
                 </div>

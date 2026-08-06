@@ -7,6 +7,8 @@ import { SupabaseConnectionModal } from './SupabaseConnectionModal'
 import { RedshiftConnectionModal } from './RedshiftConnectionModal'
 import { SqliteConnectionModal } from './SqliteConnectionModal'
 import { MariadbConnectionModal } from './MariadbConnectionModal'
+import { BigQueryConnectionModal } from './BigQueryConnectionModal'
+import { ClickHouseConnectionModal } from './ClickHouseConnectionModal'
 import type { CreateConnectionInput } from '../../../shared/hooks'
 import './connection-modal.css'
 
@@ -162,6 +164,32 @@ export function ConnectionModal({
                 />
             )
 
+        case 'bigquery':
+            return (
+                <BigQueryConnectionModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onBack={handleBack}
+                    onSaveSuccess={onSaveSuccess}
+                    userId={userId}
+                    isEditing={isEditing}
+                    existingConnection={existingConnection}
+                />
+            )
+
+        case 'clickhouse':
+            return (
+                <ClickHouseConnectionModal
+                    isOpen={isOpen}
+                    onClose={handleClose}
+                    onBack={handleBack}
+                    onSaveSuccess={onSaveSuccess}
+                    userId={userId}
+                    isEditing={isEditing}
+                    existingConnection={existingConnection}
+                />
+            )
+
         // For unsupported types, fall back to type selector
         default:
             return (
@@ -183,3 +211,5 @@ export { SnowflakeConnectionModal } from './SnowflakeConnectionModal'
 export { SupabaseConnectionModal } from './SupabaseConnectionModal'
 export { RedshiftConnectionModal } from './RedshiftConnectionModal'
 export { SqliteConnectionModal } from './SqliteConnectionModal'
+export { BigQueryConnectionModal } from './BigQueryConnectionModal'
+export { ClickHouseConnectionModal } from './ClickHouseConnectionModal'

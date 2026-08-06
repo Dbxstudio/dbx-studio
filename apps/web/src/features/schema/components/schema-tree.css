@@ -37,6 +37,10 @@
     color: #FFCC00;
 }
 
+.db-type-icon.bigquery {
+    color: #3B82F6;
+}
+
 .db-type-icon.default {
     color: #888;
 }

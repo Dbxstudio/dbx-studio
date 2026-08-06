@@ -70,7 +70,13 @@ const SYSTEM_PROMPT_WITH_TOOLS = `You are DBX Studio's AI assistant — an exper
 ## Query Safety
 - Only SELECT and WITH (CTEs) are permitted via execute_query
 - Always add LIMIT if not specified by the user
-- Quote all identifiers to handle mixed-case names`
+- Quote all identifiers to handle mixed-case names
+
+## Dialect Compatibility
+- If Database Type is \`bigquery\`, use BigQuery Standard SQL
+- For BigQuery identifiers, prefer backticks like \`project.dataset.table\`
+- For BigQuery schema context, treat dataset as the schema layer
+`
 
 /**
  * Call OpenAI API with Tool Support
