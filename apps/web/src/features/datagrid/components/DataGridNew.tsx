@@ -128,6 +128,7 @@ interface ToolbarProps {
     filterCount: number
     sortCount: number
     searchValue?: string
+    suggestions?: FilterSuggestion[]
     readOnly?: boolean
     onSearchChange?: (value: string) => void
     onToggleFullscreen: () => void
@@ -150,6 +151,76 @@ interface ToolbarProps {
     onShowProperties?: () => void
 }
 
+type FilterSuggestionKind = 'COLUMN' | 'VALUE' | 'RECENT'
+
+interface FilterSuggestion {
+    id: string
+    label: string
+    kind: FilterSuggestionKind
+    applyValue: string
+    matchQuery: string
+}
+
+const SUGGESTION_KIND_LABEL: Record<FilterSuggestionKind, string> = {
+    COLUMN: 'COLUMN',
+    VALUE: 'VALUE',
+    RECENT: 'RECENT',
+}
+
+interface ParsedQuickFilter {
+    hasEquals: boolean
+    rawColumnInput: string
+    normalizedColumnInput: string
+    valueInput: string
+    normalizedValueInput: string
+}
+
+function parseQuickFilterInput(input: string): ParsedQuickFilter {
+    const equalsIndex = input.indexOf('=')
+
+    if (equalsIndex === -1) {
+        const rawColumnInput = input.trim()
+        return {
+            hasEquals: false,
+            rawColumnInput,
+            normalizedColumnInput: rawColumnInput.toLowerCase(),
+            valueInput: '',
+            normalizedValueInput: '',
+        }
+    }
+
+    const rawColumnInput = input.slice(0, equalsIndex).trim()
+    const valueInput = input.slice(equalsIndex + 1).trim()
+
+    return {
+        hasEquals: true,
+        rawColumnInput,
+        normalizedColumnInput: rawColumnInput.toLowerCase(),
+        valueInput,
+        normalizedValueInput: valueInput.toLowerCase(),
+    }
+}
+
+function getColumnAliases(column: Column): string[] {
+    return [column.name.toLowerCase(), column.id.toLowerCase()]
+}
+
+function resolveColumnFromInput(columns: Column[], normalizedInput: string): Column | null {
+    if (!normalizedInput) return null
+
+    const exactMatch = columns.find((column) =>
+        getColumnAliases(column).some((alias) => alias === normalizedInput)
+    )
+
+    if (exactMatch) return exactMatch
+
+    const partialMatches = columns.filter((column) =>
+        getColumnAliases(column).some((alias) => alias.startsWith(normalizedInput))
+    )
+
+    return partialMatches.length === 1 ? partialMatches[0] : null
+}
+
 function Toolbar({
     tableName,
     rowCount,
@@ -162,6 +233,7 @@ function Toolbar({
     filterCount,
     sortCount,
     searchValue,
+    suggestions = [],
     readOnly = true,
     onSearchChange,
     onToggleFullscreen,
@@ -180,6 +252,110 @@ function Toolbar({
     onCancelChanges,
     onShowProperties,
 }: ToolbarProps) {
+    const filterInputWrapperRef = useRef<HTMLDivElement>(null)
+    const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
+    const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] = useState(0)
+
+    const query = (searchValue || '').trim().toLowerCase()
+
+    const filteredSuggestions = useMemo(() => {
+        if (!query) return []
+        return suggestions.slice(0, 8)
+    }, [query, suggestions])
+
+    useEffect(() => {
+        if (!query) {
+            setIsSuggestionsOpen(false)
+            return
+        }
+        setIsSuggestionsOpen(true)
+    }, [query])
+
+    useEffect(() => {
+        setHighlightedSuggestionIndex(0)
+    }, [filteredSuggestions.length])
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!filterInputWrapperRef.current) return
+            const targetNode = event.target as Node | null
+            if (targetNode && !filterInputWrapperRef.current.contains(targetNode)) {
+                setIsSuggestionsOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [])
+
+    const applySuggestion = useCallback((suggestion: FilterSuggestion) => {
+        if (!onSearchChange) return
+        onSearchChange(suggestion.applyValue)
+        setIsSuggestionsOpen(false)
+    }, [onSearchChange])
+
+    const renderHighlightedText = useCallback((text: string, textQuery: string) => {
+        const normalizedQuery = textQuery.trim().toLowerCase()
+        if (!normalizedQuery) return <>{text}</>
+
+        const matchStart = text.toLowerCase().indexOf(normalizedQuery)
+        if (matchStart === -1) return <>{text}</>
+
+        const matchEnd = matchStart + normalizedQuery.length
+
+        return (
+            <>
+                {text.slice(0, matchStart)}
+                <mark className="filter-suggestion-match">{text.slice(matchStart, matchEnd)}</mark>
+                {text.slice(matchEnd)}
+            </>
+        )
+    }, [])
+
+    const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!isSuggestionsOpen) {
+            if (e.key === 'ArrowDown' && filteredSuggestions.length > 0) {
+                e.preventDefault()
+                setIsSuggestionsOpen(true)
+            }
+            return
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setHighlightedSuggestionIndex((prev) =>
+                filteredSuggestions.length === 0 ? 0 : (prev + 1) % filteredSuggestions.length
+            )
+            return
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setHighlightedSuggestionIndex((prev) =>
+                filteredSuggestions.length === 0
+                    ? 0
+                    : (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length
+            )
+            return
+        }
+
+        if (e.key === 'Enter' && filteredSuggestions.length > 0) {
+            e.preventDefault()
+            const selection = filteredSuggestions[highlightedSuggestionIndex]
+            if (selection) {
+                applySuggestion(selection)
+            }
+            return
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault()
+            setIsSuggestionsOpen(false)
+        }
+    }, [applySuggestion, filteredSuggestions, highlightedSuggestionIndex, isSuggestionsOpen])
+
     return (
         <div className="grid-toolbar">
             <div className="toolbar-left">
@@ -268,23 +444,67 @@ function Toolbar({
             {/* Quick search filter */}
             {onSearchChange && (
                 <div className="toolbar-center">
-                    <div className="filter-input-container">
+                    <div className="filter-input-container" ref={filterInputWrapperRef}>
                         <FaFilter size={11} className="filter-input-icon" />
                         <input
                             type="text"
                             className="filter-input"
                             placeholder="Quick filter..."
                             value={searchValue || ''}
-                            onChange={(e) => onSearchChange(e.target.value)}
+                            onChange={(e) => {
+                                const value = e.target.value
+                                onSearchChange(value)
+                                setIsSuggestionsOpen(value.trim().length > 0)
+                            }}
+                            onFocus={() => {
+                                if ((searchValue || '').trim().length > 0) {
+                                    setIsSuggestionsOpen(true)
+                                }
+                            }}
+                            onKeyDown={handleSearchKeyDown}
+                            aria-label="Quick filter"
+                            aria-autocomplete="list"
+                            aria-expanded={isSuggestionsOpen}
                         />
                         {searchValue && (
                             <button
                                 className="filter-clear-btn"
-                                onClick={() => onSearchChange('')}
+                                onClick={() => {
+                                    onSearchChange('')
+                                    setIsSuggestionsOpen(false)
+                                }}
                                 title="Clear filter"
                             >
                                 <FaTimes size={10} />
                             </button>
+                        )}
+
+                        {isSuggestionsOpen && (
+                            <div className="filter-suggestions-dropdown" role="listbox" aria-label="Filter suggestions">
+                                {filteredSuggestions.length === 0 ? (
+                                    <div className="filter-suggestions-empty">No suggestions</div>
+                                ) : (
+                                    filteredSuggestions.map((suggestion, index) => (
+                                        <button
+                                            key={suggestion.id}
+                                            className={`filter-suggestion-item ${index === highlightedSuggestionIndex ? 'active' : ''}`}
+                                            type="button"
+                                            role="option"
+                                            aria-selected={index === highlightedSuggestionIndex}
+                                            onMouseEnter={() => setHighlightedSuggestionIndex(index)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => applySuggestion(suggestion)}
+                                        >
+                                            <span className="filter-suggestion-label">
+                                                {renderHighlightedText(suggestion.label, suggestion.matchQuery)}
+                                            </span>
+                                            <span className="filter-suggestion-kind">
+                                                {SUGGESTION_KIND_LABEL[suggestion.kind]}
+                                            </span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -889,19 +1109,119 @@ export function DataGridNew({
         [columns, hiddenColumns]
     )
 
+    const quickFilterSuggestions = useMemo<FilterSuggestion[]>(() => {
+        const parsed = parseQuickFilterInput(quickFilter)
+        const seen = new Set<string>()
+        const suggestions: FilterSuggestion[] = []
+
+        const addSuggestion = (
+            label: string,
+            kind: FilterSuggestionKind,
+            applyValue: string,
+            matchQuery: string
+        ) => {
+            const trimmedLabel = label.trim()
+            if (!trimmedLabel || !applyValue.trim()) return
+
+            const key = `${kind}:${applyValue.trim().toLowerCase()}`
+            if (seen.has(key)) return
+
+            seen.add(key)
+            suggestions.push({
+                id: key,
+                label: trimmedLabel,
+                kind,
+                applyValue,
+                matchQuery,
+            })
+        }
+
+        const matchingColumns = columns.filter((column) => {
+            if (!parsed.normalizedColumnInput) return true
+            return getColumnAliases(column).some((alias) => alias.includes(parsed.normalizedColumnInput))
+        })
+
+        if (!parsed.hasEquals) {
+            for (const column of matchingColumns) {
+                addSuggestion(column.name, 'COLUMN', `${column.name} = `, parsed.rawColumnInput)
+            }
+            return suggestions
+        }
+
+        const selectedColumn = resolveColumnFromInput(columns, parsed.normalizedColumnInput)
+
+        if (!selectedColumn) {
+            for (const column of matchingColumns) {
+                addSuggestion(column.name, 'COLUMN', `${column.name} = `, parsed.rawColumnInput)
+            }
+            return suggestions
+        }
+
+        const selectedColumnId = selectedColumn.id
+        const selectedColumnName = selectedColumn.name
+
+        for (const filter of filters) {
+            if (filter.column !== selectedColumnId && filter.column !== selectedColumnName) continue
+            for (const value of filter.values) {
+                const valueString = String(value)
+                if (!valueString.toLowerCase().includes(parsed.normalizedValueInput)) continue
+                addSuggestion(
+                    valueString,
+                    'RECENT',
+                    `${selectedColumnName} = ${valueString}`,
+                    parsed.valueInput
+                )
+            }
+        }
+
+        let valueCount = 0
+        const maxValues = 120
+
+        for (let rowIndex = 0; rowIndex < data.length && valueCount < maxValues; rowIndex += 1) {
+            const row = data[rowIndex]
+            const value = row[selectedColumnId]
+            if (value === null || value === undefined) continue
+
+            const valueString = String(value)
+            if (valueString.length > 120) continue
+            if (!valueString.toLowerCase().includes(parsed.normalizedValueInput)) continue
+
+            addSuggestion(
+                valueString,
+                'VALUE',
+                `${selectedColumnName} = ${valueString}`,
+                parsed.valueInput
+            )
+            valueCount += 1
+        }
+
+        return suggestions
+    }, [columns, data, filters, quickFilter])
+
     // Filter the data (client-side) using both quick filter and panel filters
     const filteredData = useMemo(() => {
         let result = data
 
-        // Apply quick filter (search across all columns)
+        // Apply quick filter (search across all columns or column=value pattern)
         if (quickFilter.trim()) {
-            const searchLower = quickFilter.toLowerCase()
-            result = result.filter((row) => {
-                return Object.values(row).some((cell) => {
+            const parsed = parseQuickFilterInput(quickFilter)
+            const selectedColumn = resolveColumnFromInput(columns, parsed.normalizedColumnInput)
+
+            if (parsed.hasEquals && selectedColumn && parsed.normalizedValueInput) {
+                result = result.filter((row) => {
+                    const cell = row[selectedColumn.id]
                     if (cell === null || cell === undefined) return false
-                    return String(cell).toLowerCase().includes(searchLower)
+                    return String(cell).toLowerCase().includes(parsed.normalizedValueInput)
                 })
-            })
+            } else {
+                const searchLower = quickFilter.toLowerCase()
+                result = result.filter((row) => {
+                    return Object.values(row).some((cell) => {
+                        if (cell === null || cell === undefined) return false
+                        return String(cell).toLowerCase().includes(searchLower)
+                    })
+                })
+            }
         }
 
         // Apply panel filters
@@ -951,7 +1271,7 @@ export function DataGridNew({
         }
 
         return result
-    }, [data, quickFilter, filters])
+    }, [columns, data, quickFilter, filters])
 
     // Get column width
     const getWidth = useCallback((col: Column) => {
@@ -1524,6 +1844,7 @@ export function DataGridNew({
                 filterCount={filters.length}
                 sortCount={Object.keys(orderBy).length}
                 searchValue={quickFilter}
+                suggestions={quickFilterSuggestions}
                 readOnly={readOnly}
                 onSearchChange={setQuickFilter}
                 onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
